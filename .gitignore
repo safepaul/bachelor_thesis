@@ -1,2 +1,10 @@
 # Personal notes
 tracking.md
+
+
+# Build results
+src/build/
+src/sdkconfig
+
+# Caches
+.cache
