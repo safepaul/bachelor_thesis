@@ -1,0 +1,4 @@
+/*
+ * Initialization function
+ * */
+void mcinit();

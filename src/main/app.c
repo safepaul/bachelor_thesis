@@ -21,6 +21,8 @@ void taskPrintTime(void *tfParams){
 }
 
 void app_main(void){
+    // NOTE: there will be a mcinit() function here
+
     // this will probably be handled by the MC initialized and MC manager in the future
     int *period = malloc(sizeof(int));
     *period = 1000;
