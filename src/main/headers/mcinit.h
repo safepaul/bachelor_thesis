@@ -2,6 +2,10 @@
 #define MCINIT_H
 
 
+/*
+ * Creates and fills the relevant data structures with the relevant data
+ * */
+void ds_init();
 
 /*
  * Creates the tasks and sets their status according to the system initial state

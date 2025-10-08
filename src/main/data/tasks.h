@@ -1,2 +1,7 @@
+#ifndef TASKS_H
+#define TASKS_H
 
-void taskPrintTime_u(void *tfParams);
+void taskPrintString_u(void *tfParams);
+void taskPrintCounter_u(void *tfParams);
+
+#endif // !TASKS_H

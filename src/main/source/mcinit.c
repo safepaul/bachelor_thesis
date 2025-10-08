@@ -21,14 +21,11 @@ void initialize_tasks(){
 
     int *period = malloc(sizeof(int));
     *period = 1000;
-    xTaskCreatePinnedToCore(taskPrintTime_u,
-                "Print Time",
-                2048,
-                period,
-                1,
-                NULL,
-                0);
+    xTaskCreate(taskPrintString_u, "Print Time", 2048, period, 1, NULL);
 
+    int *increment = malloc(sizeof(int));
+    *increment = 15;
+    xTaskCreate(taskPrintCounter_u, "Print counter", 2048, increment, 1, NULL);
 }
 
 void mcinit(){
