@@ -3,8 +3,8 @@ notes/
 
 
 # Build results
-src/build/
-src/sdkconfig
+build/
+sdkconfig
 
 # Caches
 .cache
