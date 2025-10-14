@@ -1,4 +1,5 @@
 idf_component_register(
-    SRCS "src/dict.c"
+    SRCS "src/sysparser.c"
     INCLUDE_DIRS "include"
+    PRIV_REQUIRES 
 )

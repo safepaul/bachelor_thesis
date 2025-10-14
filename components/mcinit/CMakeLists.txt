@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "src/mcinit.c"
     INCLUDE_DIRS "include"
-    PRIV_REQUIRES dict tasks
+    PRIV_REQUIRES tasks
 )

@@ -1,66 +1,65 @@
+#include "mcinit.h"
+#include "esp_log.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "freertos/idf_additions.h"
-#include "../include/tasks.h"
-#include "../include/dict.h"
+struct TaskParams_t (*params)[N_MODES] = NULL;
+const char *TAG = "MCINIT.C";
 
 /*
- * A function that creates and fills a data structure that holds what tasks are active in each mode and their parameters (tfParams included).
+ * Create a 2d array that holds the parameters of each task in every mode, or NULL if the task should
+ * not be active in a certain mode.
  * */
-void fill_task_info(){ // TODO: pass a HashTable_t argument for which table to fill
-    // mcmgr checks
-    //  - which is the destination mode
-    //  - check (maybe said in the transition table) what changes in each task (active->suspended, active->active witch diff params, stays the same) for the transition
-    //  - checks how the change has to be done for the specific transition (immediately suspend current tasks, let them run until finish...)
-    //  - check if the change has been done as expected *(for later)
-    //
-    // # First make a prototype of the logic of the function. Polish afterwards with the code generation.
-    //
-    // prototype: DS indexed by mode, containing in each "row" a struct with info about the tasks that should be active in the specific mode
-    //  -> gets filled one by one, when the tasks are being created (must be after creating the task because it stores arg_values and task_handle)
-    //  -> I dont know if the user needs to give an id to each task. Maybe the DS has to be filled in some kind of order, or maybe some specific
-    //      task has to be addressed for some reason, or (most likely) the transition function needs to address some specific tasks because of
-    //      the way the transitions have to be made. Not an issue for this DS but also not a problem to implement in the future if its needed.
-    //      A different kind of DS may have to be built here.
-    //
-    // active_tasks_in_mode() -> array of structs (active tasks), structs having: task_handle; pointer_to_args;
-    // |MODE|   |active_task_data| |active_task_data| |...|
-    //
-    // dictionary/hash_table: key (mode_id):value (array of structs)
-    
+void params_create(){
+    params = malloc(sizeof(struct TaskParams_t [N_TASKS][N_MODES]));
+    if (params != NULL) {
+        ESP_LOGI(TAG, "params data structure allocated successfully");
+    } else {
+        ESP_LOGE(TAG, "Memory allocation for the params data structure did not succeed");
+        abort();
+    }
 
+    //initialize the entries to all zeroes
+    memset(params, 0, sizeof(struct TaskParams_t [N_TASKS][N_MODES]));
 }
 
 /*
- * A function that ...
+ * Add the parameters of a task in a specific mode in the params data structure
+ * Two options of indexing the tasks:
+ *      1. the user supplies a task_id (integer) of value 0 to N_TASKS-1
+ *      [2.] the parser creates an id for each task automatically
+ *      3. the tasks are indexed by a string and the parser creates a data structure that maps
+ *      those strings to indexes in the array.
  * */
-void create_transition_info(){
+void params_add_entry(uint16_t task_id, uint16_t mode_id, struct TaskParams_t task_params){
+    if (!(params[task_id][mode_id].filled)) {
+        params[task_id][mode_id] = task_params;
+        params[task_id][mode_id].filled = true;
+        ESP_LOGI(TAG, "params entry: %ud-%ud; filled successfully!", task_id, mode_id);
+    } else {
+        ESP_LOGE(TAG, "Trying to fill params entry: %ud-%ud; but it is already filled!", task_id, mode_id);
+        abort();
+    }
+}
 
+void params_fill(){
+
+}
+
+struct TaskParams_t params_lookup(uint16_t task_id, uint16_t mode_id){
+    if (!(params[task_id][mode_id].filled)) {
+        ESP_LOGE(TAG, "Trying to lookup params entry: %ud-%ud; but it is not filled!", task_id, mode_id);
+        abort();
+    }
+    ESP_LOGI(TAG, "Returning params entry: %ud-%ud; successfully!", task_id, mode_id);
+    return params[task_id][mode_id];
 }
 
 void mcinit(){
-    // Data structure holding information about the active tasks in each mode
-    dict_create();
-    // Create the tasks and fill the Data structure with the task information
-    fill_task_info();
-
-
-    /*
-    // TODO: pull the task parameters from a data structure done in other function
-    puts("\nInitializing all tasks");
-
-
-    int *period = malloc(sizeof(int));
-    *period = 1000;
-    TaskHandle_t printStringHandle = NULL;
-    xTaskCreate(taskPrintString_u, "Print String", 2048, period, 1, &printStringHandle);
-    // TODO: function that inserts this in the task info data structure, only if the creation succeeded. handle errors and return values.
-
-
-    int *increment = malloc(sizeof(int));
-    *increment = 15;
-    xTaskCreate(taskPrintCounter_u, "Print counter", 2048, increment, 1, NULL);
-    */
+    params_create();
+    struct TaskParams_t example_params = { .args = NULL, .filled = 0, .priority = 10 };
+    params_add_entry(0, 0, example_params);
+    printf("Priority of entry at 0-0: %d\n", params[0][0].priority);
 }
-
