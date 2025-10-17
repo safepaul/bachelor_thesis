@@ -1,4 +1,5 @@
 idf_component_register(
-    SRCS "src/tasks.c"
+    SRCS "src/generated.c"
     INCLUDE_DIRS "include"
+    REQUIRES mcinit
 )
