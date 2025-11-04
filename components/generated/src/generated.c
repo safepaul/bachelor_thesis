@@ -55,16 +55,16 @@ const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] =
             [MODE_INIT] = { 0 },
             [MODE_NORMAL] =
                 {
-                    [TASK_PRINTSTRING]      = { .type = TYPE_NEW },
-                    [TASK_PRINTCOUNTER]     = { .type = TYPE_OLD }
+                    [TASK_PRINTSTRING]      = { .type = TYPE_NEW, .action = ACTION_RELEASE },
+                    [TASK_PRINTCOUNTER]     = { .type = TYPE_OLD, .action = ACTION_ABORT }
                 }
         },
     [MODE_NORMAL] = 
         {
             [MODE_INIT] = 
                 {
-                    [TASK_PRINTSTRING]      = { .type = TYPE_CHANGED },
-                    [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED }
+                    [TASK_PRINTSTRING]      = { .type = TYPE_CHANGED, .action = ACTION_UPDATE },
+                    [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED, .action = ACTION_CONTINUE }
                 },
             [MODE_NORMAL] = { 0 }
         }

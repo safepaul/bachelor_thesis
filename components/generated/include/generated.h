@@ -62,6 +62,7 @@ typedef struct {            // does it make sense for this struct to be here and
 typedef struct {
     
     uint8_t     type;
+    uint8_t     action;
 
 } transition_t;
 
