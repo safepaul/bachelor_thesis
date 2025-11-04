@@ -81,7 +81,7 @@ void create_tasks(){
         TaskHandle_t handle = NULL;
         BaseType_t ret;
 
-        ret = xTaskCreate(g_task_funcs[i], task_name, GLOBAL_STACK_DEPTH, t_info->args, t_info->priority, &handle);
+        ret = xTaskCreate(g_task_funcs[i], task_name, GLOBAL_STACK_DEPTH, t_info->args_p, 1, &handle);
 
         if ( ret == pdPASS ) {
             
@@ -103,8 +103,6 @@ void mcinit(){
 
     create_tasks();
 
-    printf("Priority task 0: %d\n", g_task_table[0][0].priority);
-    printf("Priority task 1: %d\n", g_task_table[1][0].priority);
     printf("Handle task 0: %p\n", g_task_handles[0]);
     printf("Handle task 1: %p\n", g_task_handles[1]);
 
