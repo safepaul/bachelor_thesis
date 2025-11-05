@@ -36,6 +36,8 @@ typedef enum {
 
     TASK_PRINTSTRING,
     TASK_PRINTCOUNTER,
+    TASK_PRINTZEROES,
+    TASK_PRINTONES,
     TASK_COUNT
 
 } task_e;
@@ -80,9 +82,15 @@ extern const TaskFunction_t g_task_funcs[TASK_COUNT];
 extern const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT];
 
 
+// TASKS
+
 void tf_printString(void *tfParams);
 
 void tf_printCounter(void *tfParams);
+
+void tf_printZeroes(void *tfParams);
+
+void tf_printOnes(void *tfParams);
 
 
 

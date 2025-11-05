@@ -20,7 +20,7 @@ mode_e get_current_mode(){
 }
 
 
-const transition_t *get_transition(mode_e old, mode_e new){
+const transition_t (*get_transition(mode_e old, mode_e new))[TASK_COUNT]{
 
     if ( old < 0 || old >= MODE_COUNT || new < 0 || new >= MODE_COUNT ) {
         

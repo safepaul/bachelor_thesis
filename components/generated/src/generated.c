@@ -11,7 +11,9 @@
 const TaskFunction_t g_task_funcs[TASK_COUNT] = { 
 
     [TASK_PRINTSTRING]  = tf_printString,
-    [TASK_PRINTCOUNTER] = tf_printCounter
+    [TASK_PRINTCOUNTER] = tf_printCounter,
+    [TASK_PRINTZEROES] = tf_printZeroes,
+    [TASK_PRINTONES] = tf_printOnes,
 
 };
 
@@ -28,21 +30,37 @@ int arg2 = 5;
 
 const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
 
-    // TASK_PRINTSTRING
-    {
+    [TASK_PRINTSTRING] = 
+        { //changed
 
-        [MODE_INIT] = {  .args_p = &arg1 },
-        [MODE_NORMAL] = {  .args_p = NULL } 
+            [MODE_INIT] = {  .args_p = &arg1 },
+            [MODE_NORMAL] = {  .args_p = NULL } 
 
-    },
+        },
 
-    // TASK_PRINTCOUNTER
-    {
+    [TASK_PRINTCOUNTER] = 
+        { //unchanged
 
-        [MODE_INIT] = {  .args_p = &arg2 },
-        [MODE_NORMAL] = {  .args_p = NULL }
+            [MODE_INIT] = {  .args_p = &arg2 },
+            [MODE_NORMAL] = {  .args_p = NULL }
 
-    }
+        },
+
+    [TASK_PRINTZEROES] = 
+        { // old
+
+            [MODE_INIT] = {  .args_p = &arg2 },
+            [MODE_NORMAL] = {  .args_p = NULL }
+
+        },
+
+    [TASK_PRINTONES] = 
+        { // new
+
+            [MODE_INIT] = {  .args_p = &arg2 },
+            [MODE_NORMAL] = {  .args_p = NULL }
+
+        },
 
 };
 
@@ -55,8 +73,10 @@ const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] =
             [MODE_INIT] = { 0 },
             [MODE_NORMAL] =
                 {
-                    [TASK_PRINTSTRING]      = { .type = TYPE_NEW, .action = ACTION_RELEASE },
-                    [TASK_PRINTCOUNTER]     = { .type = TYPE_OLD, .action = ACTION_ABORT }
+                    [TASK_PRINTSTRING]      = { .type = TYPE_CHANGED, .action = ACTION_UPDATE },
+                    [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED, .action = ACTION_CONTINUE },
+                    [TASK_PRINTZEROES]      = { .type = TYPE_OLD, .action = ACTION_ABORT },
+                    [TASK_PRINTONES]     = { .type = TYPE_NEW, .action = ACTION_RELEASE }
                 }
         },
     [MODE_NORMAL] = 
@@ -64,7 +84,9 @@ const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] =
             [MODE_INIT] = 
                 {
                     [TASK_PRINTSTRING]      = { .type = TYPE_CHANGED, .action = ACTION_UPDATE },
-                    [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED, .action = ACTION_CONTINUE }
+                    [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED, .action = ACTION_CONTINUE },
+                    [TASK_PRINTZEROES]      = { .type = TYPE_NEW, .action = ACTION_RELEASE },
+                    [TASK_PRINTONES]     = { .type = TYPE_OLD, .action = ACTION_ABORT }
                 },
             [MODE_NORMAL] = { 0 }
         }
