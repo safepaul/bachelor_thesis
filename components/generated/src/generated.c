@@ -27,6 +27,7 @@ const task_map_t g_task_map[TASK_COUNT] = {
 // TEMP
 int arg1 = 1000;
 int arg2 = 5;
+int arg3 = 2500;
 
 const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
 
@@ -34,7 +35,7 @@ const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
         { //changed
 
             [MODE_INIT] = {  .args_p = &arg1 },
-            [MODE_NORMAL] = {  .args_p = NULL } 
+            [MODE_NORMAL] = {  .args_p = &arg3 } 
 
         },
 
@@ -42,14 +43,14 @@ const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
         { //unchanged
 
             [MODE_INIT] = {  .args_p = &arg2 },
-            [MODE_NORMAL] = {  .args_p = NULL }
+            [MODE_NORMAL] = {  .args_p = &arg2 }
 
         },
 
     [TASK_PRINTZEROES] = 
         { // old
 
-            [MODE_INIT] = {  .args_p = &arg2 },
+            [MODE_INIT] = {  .args_p = NULL },
             [MODE_NORMAL] = {  .args_p = NULL }
 
         },
@@ -57,7 +58,7 @@ const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
     [TASK_PRINTONES] = 
         { // new
 
-            [MODE_INIT] = {  .args_p = &arg2 },
+            [MODE_INIT] = {  .args_p = NULL },
             [MODE_NORMAL] = {  .args_p = NULL }
 
         },
@@ -133,7 +134,7 @@ void tf_printString(void *tfParams){
 
     while (1) {
 
-        printf("\n Hello, I am printing: HELLO WORLD!\n");
+        printf("\n Hello, I am printing: HELLO WORLD! every %ud ticks\n", *sleep);
         vTaskDelay( *sleep / portTICK_PERIOD_MS);
 
     }
