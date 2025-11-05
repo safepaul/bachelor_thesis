@@ -1,7 +1,9 @@
-#include "mcmanager.h"
+#include "../include/mcmanager.h"
+#include "../../generated/include/generated.h"
+#include "../../mcinit/include/mcinit.h"
+
+
 #include "freertos/idf_additions.h"
-#include "generated.h"
-#include "mcinit.h"
 #include "stdlib.h"
 #include "esp_log.h"
 
@@ -93,4 +95,9 @@ void change_mode(mode_e new){
 }
 
 
+void mode_change_request(mode_e m){
+
+    change_mode(m);
+
+}
 
