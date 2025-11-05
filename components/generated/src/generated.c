@@ -21,6 +21,8 @@ const task_map_t g_task_map[TASK_COUNT] = {
 
     { .name = "Print String", .id = TASK_PRINTSTRING },
     { .name = "Print Counter", .id = TASK_PRINTCOUNTER },
+    { .name = "Print Zeroes", .id = TASK_PRINTZEROES },
+    { .name = "Print Ones", .id = TASK_PRINTONES },
 
 };
 
@@ -32,53 +34,52 @@ int arg3 = 2500;
 const task_info_t g_task_table[TASK_COUNT][MODE_COUNT] = {
 
     [TASK_PRINTSTRING] = 
-        { //changed
+        {
 
-            [MODE_INIT] = {  .args_p = &arg1 },
-            [MODE_NORMAL] = {  .args_p = &arg3 } 
+            [MODE_INIT] = {  .args_p = &arg1, .active = 1 },
+            [MODE_NORMAL] = {  .args_p = &arg3, .active = 1 } 
 
         },
 
     [TASK_PRINTCOUNTER] = 
-        { //unchanged
+        {
 
-            [MODE_INIT] = {  .args_p = &arg2 },
-            [MODE_NORMAL] = {  .args_p = &arg2 }
+            [MODE_INIT] = {  .args_p = &arg2, .active = 1 },
+            [MODE_NORMAL] = {  .args_p = &arg2, .active = 1 }
 
         },
 
     [TASK_PRINTZEROES] = 
-        { // old
+        {
 
-            [MODE_INIT] = {  .args_p = NULL },
-            [MODE_NORMAL] = {  .args_p = NULL }
+            [MODE_INIT] = {  .args_p = NULL, .active = 1 },
+            [MODE_NORMAL] = {  .args_p = NULL, .active = 0 }
 
         },
 
     [TASK_PRINTONES] = 
-        { // new
+        {
 
-            [MODE_INIT] = {  .args_p = NULL },
-            [MODE_NORMAL] = {  .args_p = NULL }
+            [MODE_INIT] = {  .args_p = NULL, .active = 0 },
+            [MODE_NORMAL] = {  .args_p = NULL, .active = 1 }
 
         },
 
 };
 
 
-const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] = 
-{
+const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] = {
     
     [MODE_INIT] = 
         {
-            [MODE_INIT] = { 0 },
+            [MODE_INIT] = { },
             [MODE_NORMAL] =
                 {
                     [TASK_PRINTSTRING]      = { .type = TYPE_CHANGED, .action = ACTION_UPDATE },
                     [TASK_PRINTCOUNTER]     = { .type = TYPE_UNCHANGED, .action = ACTION_CONTINUE },
                     [TASK_PRINTZEROES]      = { .type = TYPE_OLD, .action = ACTION_ABORT },
                     [TASK_PRINTONES]     = { .type = TYPE_NEW, .action = ACTION_RELEASE }
-                }
+                },
         },
     [MODE_NORMAL] = 
         {
@@ -89,7 +90,7 @@ const transition_t g_transition_table[MODE_COUNT][MODE_COUNT][TASK_COUNT] =
                     [TASK_PRINTZEROES]      = { .type = TYPE_NEW, .action = ACTION_RELEASE },
                     [TASK_PRINTONES]     = { .type = TYPE_OLD, .action = ACTION_ABORT }
                 },
-            [MODE_NORMAL] = { 0 }
+            [MODE_NORMAL] = { }
         }
 
 };

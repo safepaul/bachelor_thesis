@@ -56,6 +56,7 @@ typedef struct {            // does it make sense for this struct to be here and
     // const char*     name;
     // wcet, period <- in args?, criticality <- priority or different?
     void*           args_p;
+    bool            active;
 
 } task_info_t;
 

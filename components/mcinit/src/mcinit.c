@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "freertos/projdefs.h"
+#include "generated.h"
 #include "portmacro.h"
 
 #include "../include/mcinit.h"
@@ -90,6 +91,13 @@ void create_tasks(){
         } else {
 
             abort();
+
+        }
+
+        // Suspend tasks not active in MODE_INIT
+        if (g_task_table[i][MODE_INIT].active != true) {
+            
+            vTaskSuspend(handle);
 
         }
 

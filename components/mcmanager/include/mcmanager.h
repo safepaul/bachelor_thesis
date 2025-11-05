@@ -25,7 +25,7 @@ mode_e get_current_mode();
 
 
 /*
- * 
+ * Performs the mode transition
  *
  * */
 void change_mode(mode_e new);

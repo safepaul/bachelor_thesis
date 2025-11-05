@@ -1,6 +1,7 @@
 #include "mcmanager.h"
 #include "freertos/idf_additions.h"
 #include "generated.h"
+#include "mcinit.h"
 #include "stdlib.h"
 #include "esp_log.h"
 
@@ -33,50 +34,61 @@ const transition_t (*get_transition(mode_e old, mode_e new))[TASK_COUNT]{
 
 }
 
-// READ ME:
-// from video, tips for software dev:
-// 1. Dont just try to make it work. Make some observations. Note down what i'm intending to build, the
-// requirements, how does it fit with what already exists in the codebase. Readability, Maintainability,
-// extensibility.
-// 2. Dont change too many things at once when developing some part of the project. Commit often, with
-// small, tested changes, break down changes if they are too big. It's easier to keep track of the changes
-// and functionality that way. Create a function - commit; but dont push. Commit often and then when the full
-// feature is developed, merge the branch to master and push to origin.
-
 
 void change_mode(mode_e new){
 
-    // 4 types of tasks: Old, New, Changed, Unchanged
-    // change the parameters of the tasks that are active in modes A and B
-    // suspend the tasks that arent active in mode B
-    // start the tasks that weren't active in A but are in B
-    // XXX: What protocol to follow? -> create a manual transition table... [!]
-    //      how does a transition table look like?
-    //          It specifies, for instance, when to release a new job in
-    //          the destination mode (e.g., immediately or after some delay),
-    //          whether to complete or abort existing jobs, and whether to
-    //          update the existing jobs with the new timing parameters
-    //              XXX: Are there more things to take into account for the mode change?
-
-
     mode_e old_mode = get_current_mode();
-    const transition_t *trans_info = get_transition(old_mode, new);
 
-    // 1. check which tasks should be active in mode A and mode B
+    // Change the current mode to the new mode
+    current_mode = new;
 
-    // XXX: Do all this without separating in functions?
-    // 2. check and perform actions for each type of task
-    // function that flags tasks of the new mode as one of the four types? -> need to do that to
-    // perform the actions fromo the transition_t struct
-    // void flag_tasks(mode_e old, mode_e new, uint_8 *flagged);
-    // 0 - 1, new
-    // 1 - 0, old
-    // 1 - 1, changed
-    // 1 - 1, unchanged
+    const transition_t (*trans_info)[TASK_COUNT] = get_transition(old_mode, new);
 
-    // 3. in ascending order, perform the changes according to the flags of the active tasks in mode B
-    // void update_tasks(uint_8 *flagged);
+    // perform actions depending on the type of task
+    for (int i = 0; i < TASK_COUNT; i++) {
 
+        // assumption: task with id 0 in the enum will be also 0 in the params table
+        switch ( (*trans_info)[i].type ) {
+
+            case TYPE_NEW:
+
+                // RELEASE, which means activate the task. We assume it was started but suspended
+                vTaskResume(g_task_handles[i]);
+
+                break;
+
+            case TYPE_OLD:
+
+                // ABORT, which means suspend the task. We assume it was active before
+                vTaskSuspend(g_task_handles[i]);
+
+                break;
+
+            case TYPE_CHANGED:
+
+                // UPDATE, which means change the parameters while it's still running
+                *((unsigned int*)g_task_table[i][MODE_INIT].args_p) = *((unsigned int*)g_task_table[i][new].args_p);
+
+                break;
+
+            case TYPE_UNCHANGED:
+
+                // CONTINUE, which means do nothing
+
+                break;
+
+            default:
+
+            
+                ESP_LOGE(TAG, "Trying to perform actions on a task of unknown type: %d\n", (*trans_info)[i].type );
+                abort();
+
+                break;
+
+        
+        }
+
+    }
 
 }
 
