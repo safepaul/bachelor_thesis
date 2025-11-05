@@ -166,3 +166,33 @@ void tf_printCounter(void *tfParams){
     }
 
 }
+
+/*
+ * Task function that prints a row of zeroes every five seconds (0's)
+ *
+ * */
+void tf_printZeroes(void *tfParams){
+
+    while (1) {
+        
+        puts("0000000000000000000000000000000000000000000000000000");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+    }
+
+}
+
+/*
+ * Task function that prints a row of zeroes every five seconds (0's)
+ *
+ * */
+void tf_printOnes(void *tfParams){
+
+    while (1) {
+        
+        puts("1111111111111111111111111111111111111111111111111111");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+    }
+
+}
