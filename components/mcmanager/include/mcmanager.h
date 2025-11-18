@@ -69,7 +69,7 @@ typedef struct transition_task {
 
     uint16_t id;
     // type
-    task_params_t *new_params; // XXX: pointer to the new parameters in the mode DS &mode[dest],task[id]. Assumes the mode DS is created first. Maybe it's not worth the generator logic complication.
+    task_params_t *new_params; // XXX: pointer to the new parameters in the mode DS &mode[dest],task[id]
     Action_e action_new;
     Guard_e guard_new;
     int32_t guard_new_value;
@@ -87,44 +87,29 @@ typedef struct transition_task {
 } transition_task_t;
 
 
-typedef struct { // XXX: this will be a hashmap
+// XXX: DS holding transitions -> Linked list (worst case expecting <1000 entries, normally <100)
+typedef struct transition {
 
-    uint16_t id;
+    uint32_t id;
     uint16_t source;
     uint16_t dest;
-    transition_task_t *tasks; // Linked list
+    transition_task_t *tasks; // X: Linked list
+    struct transition *next;
 
 } transition_t;
 
 
 
-// Creates a mode in the mode list
-void mcm_create_mode(uint16_t mode_id);
 
-// Creates a new task and adds it to the end of the specified Mode
+
+
+void mcm_create_mode(uint16_t mode_id);
 void mcm_add_task_to_mode(uint16_t mode_id, uint16_t task_id, task_params_t task_params);
 
-//
 void mcm_create_transition(transition_t transition);
-
-//
 void mcm_add_task_to_transition(transition_task_t task);
 
-
-
-
-
-
-
-
-
-
-
-
-/*
- *
- * 
- * */
+transition_t transition_lookup();
 void mode_change_request();
 
 
