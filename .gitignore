@@ -8,3 +8,6 @@ sdkconfig
 
 # Caches
 .cache
+
+# Python libraries
+components/generator/tools/

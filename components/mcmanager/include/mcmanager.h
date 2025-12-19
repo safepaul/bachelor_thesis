@@ -4,8 +4,9 @@
 #include <stdint.h>
 
 
-// TODO: check all structures for padding
 
+
+// TODO: check all structures for padding
 
 //   -  TASK STRUCTURES  -
 
@@ -16,40 +17,16 @@ typedef struct {
 
 } task_params_t;
 
-
-// structure defining the relevant information of a task
-typedef struct task_info {
-
-    uint16_t id;
-    task_params_t params;
-    struct task_info *next;
-
-} task_info_t;
-
-
-//  -  MODE STRUCTURES  -
-
-// structure defining the relevant information of a mode
-// `tasks` is a pointer to the first node of the task list
-typedef struct mode_info {
-
-    uint16_t id;
-    task_info_t *tasks;
-    struct mode_info *next;
-
-} mode_info_t;
-
-
 //  -  TRANSITION STRUCTURES --
-
-// TODO: develop a hashmap for the transition list
 
 typedef enum {
 
     // TODO: Add support for all of the actions
+    ACTION_NONE,
     ACTION_CONTINUE,
     ACTION_ABORT,
     ACTION_UPDATE,
+    ACTION_RELEASE,
     ACTION_COUNT
 
 } Action_e;
@@ -57,44 +34,51 @@ typedef enum {
 typedef enum {
 
     // TODO: Add the names for all of the available guards and add support for all of them
-    GUARD_NULL,
+    GUARD_NONE,
     GUARD_COUNT
 
 } Guard_e;
 
+// Structure serving as a template that holds the values for what action to perform on a job depending on its type
+// and the guard associated with it. Some fields may not be necessary for a specific type of job; those fields will
+// have value ACTION_NONE, GUARD_NONE and -1 for action, guard and guard value respectively XXX: subject to change.
+typedef struct {
+
+    // TODO: with an uint8_t is enough for actions and guards, but enums are integers. Find a way to change that
+    // and still be practical (#defines, casting... whatever)
+
+    Action_e    anew;
+    Guard_e     gnew;
+    int16_t     gnewval;
+
+    Action_e    apend;
+    Guard_e     gpend;
+    int16_t     gpendval;
+
+    Action_e    aexec;
+    Guard_e     gexec;
+    int16_t     gexecval;
+
+} job_primitives_t;
+
 // TODO: This is a generic structure. Make specific ones for each type of task (4 in total) and the generator 
 // generates the specified one. Type is transition_task_t but value is the specific one. I've seen this done
 // in the linux kernel with tasks.
-typedef struct transition_task {
+typedef struct {
 
-    uint16_t id;
-    // type
-    task_params_t *new_params; // XXX: pointer to the new parameters in the mode DS &mode[dest],task[id]
-    Action_e action_new;
-    Guard_e guard_new;
-    int32_t guard_new_value;
-
-    Action_e action_pend;
-    Guard_e guard_pend;
-    int32_t guard_pend_value;
-
-    Action_e action_exec;
-    Guard_e guard_exec;
-    int32_t guard_exec_value;
-
-    struct transition_task *next;
+    uint16_t            task_id;
+    uint16_t            transition_id;
+    task_params_t       params;
+    job_primitives_t    primitives;
 
 } transition_task_t;
 
-
-// XXX: DS holding transitions -> Linked list (worst case expecting <1000 entries, normally <100)
 typedef struct transition {
 
-    uint32_t id;
-    uint16_t source;
-    uint16_t dest;
-    transition_task_t *tasks; // X: Linked list
-    struct transition *next;
+    uint32_t            id;
+    uint16_t            source;
+    uint16_t            dest;
+    transition_task_t   *taskset;
 
 } transition_t;
 
@@ -103,16 +87,49 @@ typedef struct transition {
 
 
 
-void mcm_create_mode(uint16_t mode_id);
-void mcm_add_task_to_mode(uint16_t mode_id, uint16_t task_id, task_params_t task_params);
 
-void mcm_create_transition(transition_t transition);
-void mcm_add_task_to_transition(transition_task_t task);
-
-transition_t transition_lookup();
-void mode_change_request();
+void mcm_create_transition(uint32_t id, uint16_t source, uint16_t dest);
+void mcm_add_task_to_transition(uint16_t task_id, uint16_t transition_id, task_params_t params, job_primitives_t primitives);
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// NOTE: These may not be needed as the transitions have all the information necessary for the mode changes.
+// Although maybe in the future I realize I need DS's for the modes and tasks
+//
+// void mcm_create_mode(uint16_t mode_id);
+// void mcm_add_task_to_mode(uint16_t mode_id, uint16_t task_id, task_params_t task_params);
+// void mcm_add_task_to_transition(transition_task_t task);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// TODO: add a debug mode
+void debug_print_transition_table();
+void debug_print_trans_tasks_table();
 
 #endif // !MCMANAGER_H

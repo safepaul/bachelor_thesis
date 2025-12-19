@@ -1,21 +1,12 @@
-#include "../components/mcinit/include/mcinit.h"
-#include "../components/mcmanager/include/mcmanager.h"
-#include "unistd.h"
+#include "mcmanager.h"
+#include "gen_data.h"
 
 
 
 void app_main(void){
-    mcinit();
 
+    generate_data();
+    debug_print_transition_table();
+    debug_print_trans_tasks_table();
 
-    sleep(10);
-
-
-    mode_change_request(MODE_NORMAL);
-
-
-    sleep(5);
-
-
-    mode_change_request(MODE_INIT);
 }
