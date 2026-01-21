@@ -11,3 +11,7 @@ sdkconfig
 
 # Python libraries
 components/generator/tools/
+
+# Generator results
+components/generator/include/*
+components/generator/src/*
