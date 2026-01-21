@@ -11,7 +11,3 @@ sdkconfig
 
 # Python libraries
 components/generator/tools/
-
-# Generator results
-components/generator/include/gen_data.h
-components/generator/src/gen_data.c
