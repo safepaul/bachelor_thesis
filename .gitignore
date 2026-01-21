@@ -13,5 +13,5 @@ sdkconfig
 components/generator/tools/
 
 # Generator results
-components/generator/include/*
-components/generator/src/*
+components/generator/include/gen_data.h
+components/generator/src/gen_data.c
