@@ -6,29 +6,22 @@ transitions:
       - task_id: 2 # changed
         parameters:
           period: 200
+          priority: 10
         primitives:
           anew: "ACTION_RELEASE" # No action
           gnew: "GUARD_NONE"
           gnewval: -1
-          apend: "ACTION_CONTINUE"
-          gnew: "GUARD_NONE"
-          gpendval: -1
-          apend: "ACTION_CONTINUE"
-          gnew: "GUARD_NONE"
+          aexec: "ACTION_CONTINUE"
+          gexec: "GUARD_NONE"
           gexecval: -1
       - task_id: 5 # new
         parameters:
           period: 500
+          priority: 10
         primitives:
           anew: "ACTION_RELEASE"
           gnew: "GUARD_NONE"
           gnewval: -1
-          apend: "ACTION_CONTINUE"
-          gnew: "GUARD_NONE"
-          gpendval: -1
-          apend: "ACTION_CONTINUE"
-          gnew: "GUARD_NONE"
-          gexecval: -1
   - trans_id: 1
     source_mode: 1
     dest_mode: 0
@@ -36,25 +29,29 @@ transitions:
       - task_id: 2 # changed
         parameters:
           period: 100
+          priority: 10
         primitives:
           anew: "ACTION_RELEASE"
           gnew: "GUARD_NONE"
           gnewval: -1
-          apend: "ACTION_CONTINUE"
-          gpend: "GUARD_NONE"
-          gpendval: -1
           aexec: "ACTION_CONTINUE" 
           gexec: "GUARD_NONE"
           gexecval: -1
       - task_id: 5 # old
         parameters:
           period: 0
+          priority: 10
         primitives:
-          apend: "ACTION_CONTINUE"
-          gpend: "GUARD_NONE"
-          gpendval: -1
           aexec: "ACTION_CONTINUE" 
           gexec: "GUARD_NONE"
           gexecval: -1
 
 # if the guard is not none, guard value must not be -1
+
+tasks:
+  - id: 2
+    name: "taskTwo"
+    func: "taskTwo_utask"
+  - id: 5
+    name: "taskFive"
+    func: "taskFive_utask"

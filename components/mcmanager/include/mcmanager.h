@@ -1,72 +1,75 @@
 #ifndef MCMANAGER_H
 #define MCMANAGER_H
 
+#include "freertos/idf_additions.h"
+#include "portmacro.h"
 #include <stdint.h>
 
 
+// guards and actions
+#define ACTION_NONE      (uint8_t) 0
+#define ACTION_CONTINUE  (uint8_t) 1
+#define ACTION_ABORT     (uint8_t) 2
+#define ACTION_UPDATE    (uint8_t) 3
+#define ACTION_RELEASE   (uint8_t) 4
+
+#define GUARD_NONE      (uint8_t) 0
 
 
+// general bounds
+#define MAX_TRANSITIONS (uint16_t)   64
+#define MAX_TASKS       (uint8_t)    32
+#define MAX_TRANS_TASKS (uint16_t)   MAX_TRANSITIONS * MAX_TASKS 
+
+
+
+
+// // needed to force 8bit size on both actions and guards to save space. Actions and Guards defined with #define directives
+// typedef uint8_t Action_t;
+// typedef uint8_t Guard_t;
+
+
+
+
+
+// TODO: using same stack size (2048). This may need to be adjusted for each task.
 // TODO: check all structures for padding
 
-//   -  TASK STRUCTURES  -
-
-// structure defining the parameters of a task
+// structure defining the parameters of a task (in a specific transition)
 typedef struct {
 
-    uint16_t period;
+    uint16_t    period;
+    UBaseType_t priority;
 
 } task_params_t;
 
-//  -  TRANSITION STRUCTURES --
+// structure defining the information that the program needs to start user tasks according to the specifications of the user (generated)
+typedef struct {
 
-typedef enum {
+    TaskFunction_t  func;
+    char*           name;
+    TaskHandle_t    handle;
 
-    // TODO: Add support for all of the actions
-    ACTION_NONE,
-    ACTION_CONTINUE,
-    ACTION_ABORT,
-    ACTION_UPDATE,
-    ACTION_RELEASE,
-    ACTION_COUNT
-
-} Action_e;
-
-typedef enum {
-
-    // TODO: Add the names for all of the available guards and add support for all of them
-    GUARD_NONE,
-    GUARD_COUNT
-
-} Guard_e;
+} task_info_t;
 
 // Structure serving as a template that holds the values for what action to perform on a job depending on its type
 // and the guard associated with it. Some fields may not be necessary for a specific type of job; those fields will
 // have value ACTION_NONE, GUARD_NONE and -1 for action, guard and guard value respectively XXX: subject to change.
 typedef struct {
 
-    // TODO: with an uint8_t is enough for actions and guards, but enums are integers. Find a way to change that
-    // and still be practical (#defines, casting... whatever)
-
-    Action_e    anew;
-    Guard_e     gnew;
+    uint8_t     anew;
+    uint8_t     gnew;
     int16_t     gnewval;
 
-    Action_e    apend;
-    Guard_e     gpend;
-    int16_t     gpendval;
-
-    Action_e    aexec;
-    Guard_e     gexec;
+    uint8_t     aexec;
+    uint8_t     gexec;
     int16_t     gexecval;
 
 } job_primitives_t;
 
-// TODO: This is a generic structure. Make specific ones for each type of task (4 in total) and the generator 
-// generates the specified one. Type is transition_task_t but value is the specific one. I've seen this done
-// in the linux kernel with tasks.
 typedef struct {
 
-    uint16_t            task_id;
+    uint8_t            task_id;
     uint16_t            transition_id;
     task_params_t       params;
     job_primitives_t    primitives;
@@ -75,7 +78,7 @@ typedef struct {
 
 typedef struct transition {
 
-    uint32_t            id;
+    uint16_t            id;
     uint16_t            source;
     uint16_t            dest;
     transition_task_t   *taskset;
@@ -90,8 +93,12 @@ typedef struct transition {
 
 void mcm_create_transition(uint32_t id, uint16_t source, uint16_t dest);
 void mcm_add_task_to_transition(uint16_t task_id, uint16_t transition_id, task_params_t params, job_primitives_t primitives);
+void mcm_add_task_info(uint8_t task_id, TaskFunction_t func, char* name);
+void spawn_tasks();
 
-
+void perform_action(TaskHandle_t handle, uint8_t action);
+void handle_task(transition_task_t task, eTaskState state);
+void mc_request(uint16_t transition_id);
 
 
 
@@ -131,5 +138,6 @@ void mcm_add_task_to_transition(uint16_t task_id, uint16_t transition_id, task_p
 // TODO: add a debug mode
 void debug_print_transition_table();
 void debug_print_trans_tasks_table();
+void debug_print_task_info_table();
 
 #endif // !MCMANAGER_H

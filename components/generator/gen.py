@@ -19,7 +19,12 @@ def generate():
         h.write("#ifndef GEN_DATA_H\n")
         h.write("#define GEN_DATA_H\n\n")
 
+
+        # h.write("extern const char* task_names[];\n")
+        # h.write("extern const task_info_t task_info[];\n")
+
         h.write("void generate_data();\n")
+        # h.write("void spawn_tasks();\n")
 
 
         # Include guards
@@ -30,19 +35,45 @@ def generate():
         s.write("#include \"gen_data.h\"\n")
         s.write("#include \"mcmanager.h\"\n")
         s.write("#include \"stddef.h\"\n")
+        s.write("#include \"tasks.h\"\n")
         s.write("\n\n")
+
+
+
+        # open the YAML file and extract its contents to 'data'
+        with open("model.yaml") as spec:
+            data = yaml.safe_load(spec)
+
+
+
+
+
+
+
+
+
+
+        s.write("\n\n")
+
 
         s.write("void generate_data(){\n\n")
 
 
+        # task information
+        for task in data.get("tasks"):
+
+            s.write("\n")
+
+            s.write(f"\tmcm_add_task_info( {task.get("id")}, &{task.get("func")}, \"{task.get("name")}\" );")
 
 
-        with open("model.yaml") as spec:
-            data = yaml.safe_load(spec)
+        s.write("\n\n")
 
-        print(f"Safe load: {len(data.get("transitions"))}")
-
+        # transition information
         for tr in data.get("transitions"):
+
+
+
             ## CREATING TRANSITION
             # print(type(tr))
             tr_id = tr.get("trans_id")
@@ -67,19 +98,17 @@ def generate():
                 parameters = task.get("parameters")
                 
                 task_period = parameters.get("period", 0)
+                task_priority = parameters.get("priority", 0)
                 s.write(f"\tmcm_add_task_to_transition({task_id}, {tr_id}, (task_params_t)")
-                s.write(f"{{ .period = {task_period} }}")
+                s.write(f"{{ .period = {task_period}, .priority = {task_priority} }}")
 
 
 
                 # if the member doesnt exist, default to null
                 primitives = task.get("primitives")
                 anew = primitives.get("anew", "ACTION_NONE")
-                gnew = primitives.get("anew", "GUARD_NONE")
+                gnew = primitives.get("gnew", "GUARD_NONE")
                 gnewval = primitives.get("gnewval", -1)
-                apend = primitives.get("apend", "ACTION_NONE")
-                gpend = primitives.get("gpend", "GUARD_NONE")
-                gpendval = primitives.get("gpendval", -1)
                 aexec = primitives.get("aexec", "ACTION_NONE")
                 gexec = primitives.get("gexec", "GUARD_NONE")
                 gexecval = primitives.get("gexecval", -1)
@@ -88,16 +117,16 @@ def generate():
                 s.write(f", (job_primitives_t){{.anew = {anew}")
                 s.write(f", .gnew = {gnew}")
                 s.write(f", .gnewval = {gnewval}")
-                s.write(f", .apend = {apend}")
-                s.write(f", .gpend = {gpend}")
-                s.write(f", .gpendval = {gpendval}")
                 s.write(f", .aexec = {aexec}")
                 s.write(f", .gexec = {gexec}")
                 s.write(f", .gexecval = {gexecval}")
 
 
+
                 
                 s.write("});\n")
+
+
 
         
         
