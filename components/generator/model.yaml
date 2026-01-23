@@ -3,7 +3,7 @@ transitions:
     source_mode: 0
     dest_mode: 1
     taskset:
-      - task_id: 2 # changed
+      - task_id: 0 # changed
         parameters:
           period: 200
           priority: 10
@@ -14,7 +14,7 @@ transitions:
           aexec: "ACTION_CONTINUE"
           gexec: "GUARD_NONE"
           gexecval: -1
-      - task_id: 5 # new
+      - task_id: 1 # new
         parameters:
           period: 500
           priority: 10
@@ -26,7 +26,7 @@ transitions:
     source_mode: 1
     dest_mode: 0
     taskset:
-      - task_id: 2 # changed
+      - task_id: 0 # changed
         parameters:
           period: 100
           priority: 10
@@ -37,7 +37,7 @@ transitions:
           aexec: "ACTION_CONTINUE" 
           gexec: "GUARD_NONE"
           gexecval: -1
-      - task_id: 5 # old
+      - task_id: 1 # old
         parameters:
           period: 0
           priority: 10
@@ -49,9 +49,16 @@ transitions:
 # if the guard is not none, guard value must not be -1
 
 tasks:
-  - id: 2
-    name: "taskTwo"
-    func: "taskTwo_utask"
-  - id: 5
-    name: "taskFive"
-    func: "taskFive_utask"
+  - id: 0
+    name: "taskZero"
+    func: "taskZero_utask"
+  - id: 1
+    name: "taskOne"
+    func: "taskOne_utask"
+
+
+modes:
+  - id: 0
+    name: "MODE_INIT"
+  - id: 1
+    name: "MODE_EMERGENCY"

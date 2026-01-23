@@ -7,11 +7,11 @@
  *  
  *
 */
-void taskTwo_utask(void *pvParameters){
+void taskZero_utask(void *pvParameters){
 
     while (1) {
         
-        puts("[T2] Hello! Task two speaking");
+        puts("[T2] Hello! Task Zero speaking");
         vTaskDelay(pdMS_TO_TICKS(1000));
 
     }
@@ -24,11 +24,11 @@ void taskTwo_utask(void *pvParameters){
  *  
  *
 */
-void taskFive_utask(void *pvParameters){
+void taskOne_utask(void *pvParameters){
 
     while (1) {
         
-        puts("[T5] Hello! Task five speaking");
+        puts("[T5] Hello! Task One speaking");
         vTaskDelay(pdMS_TO_TICKS(2500));
 
     }

@@ -9,13 +9,9 @@
 
 void app_main(void){
 
-    generate_data();
     spawn_tasks();
+    initial_setup();
 
-    mc_request(1);
-
-    // debug_print_transition_table();
-    // debug_print_trans_tasks_table();
-    debug_print_task_info_table();
+    // mc_request(1);
 
 }
