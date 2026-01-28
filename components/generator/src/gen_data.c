@@ -12,23 +12,28 @@ const uint8_t mode_transitions[N_MODES][N_MODES] = {
 
 	[0][0] = NO_TRANSITION,
 	[0][1] = 0,
+	[0][2] = NO_TRANSITION,
 	[1][0] = 1,
 	[1][1] = NO_TRANSITION,
+	[1][2] = NO_TRANSITION,
+	[2][0] = NO_TRANSITION,
+	[2][1] = NO_TRANSITION,
+	[2][2] = NO_TRANSITION,
 
 
 };
 
-static const task_trans_data_t trans_0_taskset[2] = {
+static const trans_task_t trans_0_taskset[2] = {
 
-	(task_trans_data_t){ .transition_id = 0, .task_id = 0, .params = (task_params_t){ .period = 200, .priority = 10 }, .primitives = (job_primitives_t){ .anew = ACTION_RELEASE, .gnew = GUARD_NONE, .gnewval = -1, .aexec = ACTION_CONTINUE, .gexec = GUARD_NONE, .gexecval = -1, } },
-	(task_trans_data_t){ .transition_id = 0, .task_id = 1, .params = (task_params_t){ .period = 500, .priority = 10 }, .primitives = (job_primitives_t){ .anew = ACTION_RELEASE, .gnew = GUARD_NONE, .gnewval = -1, .aexec = ACTION_NONE, .gexec = GUARD_NONE, .gexecval = -1, } },
+	(trans_task_t){ .transition_id = 0, .task_id = 0, .params = (task_params_t){ .period = 200, .priority = 10 }, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_TRUE, .guard_value = -1, } },
+	(trans_task_t){ .transition_id = 0, .task_id = 1, .params = (task_params_t){ .period = 500, .priority = 10 }, .primitives = (job_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
 
 };
 
-static const task_trans_data_t trans_1_taskset[2] = {
+static const trans_task_t trans_1_taskset[2] = {
 
-	(task_trans_data_t){ .transition_id = 1, .task_id = 0, .params = (task_params_t){ .period = 100, .priority = 10 }, .primitives = (job_primitives_t){ .anew = ACTION_RELEASE, .gnew = GUARD_NONE, .gnewval = -1, .aexec = ACTION_CONTINUE, .gexec = GUARD_NONE, .gexecval = -1, } },
-	(task_trans_data_t){ .transition_id = 1, .task_id = 1, .params = (task_params_t){ .period = 0, .priority = 10 }, .primitives = (job_primitives_t){ .anew = ACTION_NONE, .gnew = GUARD_NONE, .gnewval = -1, .aexec = ACTION_CONTINUE, .gexec = GUARD_NONE, .gexecval = -1, } },
+	(trans_task_t){ .transition_id = 1, .task_id = 0, .params = (task_params_t){ .period = 100, .priority = 10 }, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_TRUE, .guard_value = -1, } },
+	(trans_task_t){ .transition_id = 1, .task_id = 1, .params = (task_params_t){ .period = 0, .priority = 10 }, .primitives = (job_primitives_t){ .action = ACTION_SUSPEND, .guard = GUARD_TRUE, .guard_value = -1, } },
 
 };
 

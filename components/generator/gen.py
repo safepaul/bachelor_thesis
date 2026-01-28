@@ -26,8 +26,11 @@ def generate():
         h.write("\n\n")
         h.write("#include \"mcmanager.h\"\n\n\n")
         h.write("\n// macros for the modes\n")
-        h.write("#define MODE_NONE (uint8_t) 0\n")
-        h.write("#define MODE_INIT (uint8_t) 1\n")
+
+        # generate mode macros
+        for mode in data.get("modes"):
+                h.write(f"#define {mode.get("name")} (uint8_t) {mode.get("id")}\n")
+
         h.write("\n\n")
         h.write("// useful constants for the program\n")
         h.write(f"#define N_TASKS {n_tasks}\n")
@@ -36,6 +39,9 @@ def generate():
         h.write("\n")
         h.write("// macro for declaring that a transition doesn't exist or hasn't been found\n")
         h.write("#define NO_TRANSITION (uint8_t) 255\n")
+        h.write("\n")
+        h.write("// macro for declaring that a guard has no value\n")
+        h.write("#define NO_GUARD_VALUE (int16_t) -1\n")
         h.write("\n\n")
 
 
@@ -120,19 +126,16 @@ def generate():
             taskset = transition.get("taskset")
             taskset_size = len(taskset)
 
-            s.write(f"static const task_trans_data_t trans_{trans_id}_taskset[{taskset_size}] = {{\n\n")
+            s.write(f"static const trans_task_t trans_{trans_id}_taskset[{taskset_size}] = {{\n\n")
 
             for task in taskset:
                 parameters = task.get("parameters")
                 primitives = task.get("primitives")
 
-                s.write(f"\t(task_trans_data_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .params = (task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }}, .primitives = (job_primitives_t){{ ")
-                s.write(f".anew = {primitives.get("anew", "ACTION_NONE")}, ")
-                s.write(f".gnew = {primitives.get("gnew", "GUARD_NONE")}, ")
-                s.write(f".gnewval = {primitives.get("gnewval", -1)}, ")
-                s.write(f".aexec = {primitives.get("aexec", "ACTION_NONE")}, ")
-                s.write(f".gexec = {primitives.get("gexec", "GUARD_NONE")}, ")
-                s.write(f".gexecval = {primitives.get("gexecval", -1)}, ")
+                s.write(f"\t(trans_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .params = (task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }}, .primitives = (job_primitives_t){{ ")
+                s.write(f".action = {primitives.get("action", "ACTION_NONE")}, ")
+                s.write(f".guard = {primitives.get("guard", "GUARD_NONE")}, ")
+                s.write(f".guard_value = {primitives.get("guard_value", -1)}, ")
                 s.write("} },\n")
 
             s.write("\n};\n\n")

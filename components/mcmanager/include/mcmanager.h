@@ -7,17 +7,20 @@
 
 
 // guards and actions
-#define ACTION_NONE      (uint8_t) 0
-#define ACTION_CONTINUE  (uint8_t) 1
-#define ACTION_ABORT     (uint8_t) 2
-#define ACTION_UPDATE    (uint8_t) 3
-#define ACTION_RELEASE   (uint8_t) 4
+#define ACTION_NONE         (uint8_t) 0
+#define ACTION_CONTINUE     (uint8_t) 1
+#define ACTION_SUSPEND      (uint8_t) 2
+#define ACTION_UPDATE       (uint8_t) 3
+#define ACTION_RELEASE      (uint8_t) 4
 
-#define GUARD_NONE      (uint8_t) 0
+#define GUARD_NONE          (uint8_t) 0
+#define GUARD_TRUE          (uint8_t) 1
+#define GUARD_OFFSETMCR     (uint8_t) 2
+#define GUARD_BACKLOG       (uint8_t) 3
 
 
 // general bounds
-#define MAX_TRANS_TASKS (uint16_t)   N_TRAN * N_TASKS 
+#define MAX_TRANS_TASKS (uint16_t)   N_TRANS * N_TASKS 
 
 
 
@@ -35,13 +38,9 @@ typedef struct {
 // have value ACTION_NONE, GUARD_NONE and -1 for action, guard and guard value respectively XXX: subject to change.
 typedef struct {
 
-    uint8_t     anew;
-    uint8_t     gnew;
-    int16_t     gnewval;
-
-    uint8_t     aexec;
-    uint8_t     gexec;
-    int16_t     gexecval;
+    uint8_t     action;
+    uint8_t     guard;
+    int16_t     guard_value;
 
 } job_primitives_t;
 
@@ -52,11 +51,11 @@ typedef struct {
     uint16_t            transition_id;
     uint8_t             task_id;
 
-} task_trans_data_t;
+} trans_task_t;
 
-typedef struct transition {
+typedef struct {
 
-    const task_trans_data_t *taskset;
+    const trans_task_t *taskset;
     uint8_t                 taskset_size;
     uint8_t                 source_mode;
     uint8_t                 dest_mode;
@@ -67,28 +66,22 @@ typedef struct transition {
 
 
 void initial_setup();
+void apply_primitive(const trans_task_t *task);
 void perform_action(TaskHandle_t handle, uint8_t action);
-void handle_task(task_trans_data_t task, eTaskState state);
 void mc_request(uint8_t target_mode);
 
 
 
 
 
+typedef struct {
 
+    TaskHandle_t handle;
+    uint8_t action;
 
+} offsetmcr_info_t;
 
+void callback_offsetmcr_timer( TimerHandle_t xTimer );
 
-
-
-
-
-
-
-
-// TODO: add a debug mode
-void debug_print_transition_table();
-void debug_print_trans_tasks_table();
-void debug_print_task_info_table();
 
 #endif // !MCMANAGER_H

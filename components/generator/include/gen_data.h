@@ -10,15 +10,19 @@
 // macros for the modes
 #define MODE_NONE (uint8_t) 0
 #define MODE_INIT (uint8_t) 1
+#define MODE_EMERGENCY (uint8_t) 2
 
 
 // useful constants for the program
 #define N_TASKS 2
 #define N_TRANS 2
-#define N_MODES 2
+#define N_MODES 3
 
 // macro for declaring that a transition doesn't exist or hasn't been found
 #define NO_TRANSITION (uint8_t) 255
+
+// macro for declaring that a guard has no value
+#define NO_GUARD_VALUE (int16_t) -1
 
 
 // public array containing all transitions  
