@@ -36,6 +36,7 @@ def generate():
         h.write(f"#define N_TASKS {n_tasks}\n")
         h.write(f"#define N_TRANS {n_trans}\n")
         h.write(f"#define N_MODES {n_modes}\n")
+
         h.write("\n")
         h.write("// macro for declaring that a transition doesn't exist or hasn't been found\n")
         h.write("#define NO_TRANSITION (uint8_t) 255\n")
@@ -45,8 +46,12 @@ def generate():
         h.write("\n\n")
 
 
+        ## --- mode table ---
+        h.write("// array containing all modes and information related to them  \n")
+        h.write("extern const mode_info_t modes[N_MODES];\n\n")
 
-        h.write("// public array containing all transitions  \n")
+        ## --- transition table ---
+        h.write("// array containing all transitions  \n")
         h.write("extern const transition_t transitions[N_TRANS];\n\n")
 
         h.write("// lookup table (2d array) containing the id's of the transitions corresponding to each mode pair\n")
@@ -57,10 +62,16 @@ def generate():
         # NOTE: I can maybe make this array constant, but not such big of a deal
         h.write("// array holding task handles\n")
         h.write("extern TaskHandle_t task_handles[N_TASKS];\n")
+        h.write("\n")
+        h.write("// array holding timer handles\n")
+        h.write("extern TimerHandle_t timer_handles[N_TASKS];\n")
 
         h.write("\n")
         h.write("// function for spawning tasks, for their handles and initialization\n")
-        h.write("void spawn_tasks();\n")
+        h.write("void create_tasks();\n")
+        h.write("\n")
+        h.write("// function for creating the task timers, afterwards started and managed by the mcmanager on startup\n")
+        h.write("void create_timers();\n")
 
 
 
@@ -83,8 +94,8 @@ def generate():
         s.write("#include \"tasks.h\"\n")
         s.write("\n\n")
 
-        s.write("TaskHandle_t task_handles[N_TASKS];\n\n\n\n")
-
+        s.write("TaskHandle_t task_handles[N_TASKS];\n")
+        s.write("TimerHandle_t timer_handles[N_TASKS];\n\n\n\n")
 
         # returns the id of the transition from source to dest if exists; if not, it returns NULL
         ## TODO: must check if there are more than one transition with the same source+dest pair
@@ -112,15 +123,14 @@ def generate():
                 s.write(f"\t[{src_id}][{dest_id}] = {fetch_result},\n")
 
 
-
-
-
         s.write("\n\n};\n\n")
 
 
         # code generation
 
-        ## taskset specific arrays, one per transition, containing data on what and how to perform the actions to a specific task in a specific transition
+
+        ## --- taskset specific arrays --- 
+        ## one per transition, containing data on what and how to perform the actions to a specific task in a specific transition
         for transition in data.get("transitions"):
             trans_id = transition.get("trans_id")
             taskset = transition.get("taskset")
@@ -129,10 +139,9 @@ def generate():
             s.write(f"static const trans_task_t trans_{trans_id}_taskset[{taskset_size}] = {{\n\n")
 
             for task in taskset:
-                parameters = task.get("parameters")
                 primitives = task.get("primitives")
 
-                s.write(f"\t(trans_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .params = (task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }}, .primitives = (job_primitives_t){{ ")
+                s.write(f"\t(trans_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .primitives = (job_primitives_t){{ ")
                 s.write(f".action = {primitives.get("action", "ACTION_NONE")}, ")
                 s.write(f".guard = {primitives.get("guard", "GUARD_NONE")}, ")
                 s.write(f".guard_value = {primitives.get("guard_value", -1)}, ")
@@ -141,7 +150,7 @@ def generate():
             s.write("\n};\n\n")
 
 
-        ## main array, containing all transitions
+        ## --- transition table ---
         s.write("const transition_t transitions[N_TRANS] = {\n\n")
 
         for transition in data.get("transitions"):
@@ -156,32 +165,63 @@ def generate():
         s.write("\n};\n\n")
 
 
+        s.write("\n\n\n")
+
+        ## --- mode tasks specific arrays --- 
+        ## one per mode, containing information about the parameters of the tasks that are active in a specific mode 
+        for mode in data.get("modes"):
+            mode_id = mode.get("id")
+            tasks = mode.get("active_tasks")
+            n_tasks = len(tasks)
+
+            s.write(f"static const mode_task_t mode_{mode_id}_tasks[{n_tasks}] = {{\n\n")
+
+            count = 0
+            for task in tasks:
+                parameters = task.get("parameters")
+                s.write(f"\t[{count}] = {{ .id = {task.get("id")}, .parameters = (task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }} }}, \n") 
+                count += 1
+
+            s.write("\n};\n\n")
+
+
+        ## --- mode table ---
+        s.write("const mode_info_t modes[N_MODES] =  {\n\n")
+
+        for mode in data.get("modes"):
+            mode_id = mode.get("id")
+            mode_name = mode.get("name")
+            n_tasks = len(mode.get("active_tasks"))
+
+            s.write(f"\t[{mode_id}] = {{ .id = {mode_id}, .n_tasks = {n_tasks}, .tasks = mode_{mode_id}_tasks  }},\n")
+
+        s.write("\n};\n\n")
+
+
 
         ## function for spawning the tasks, all suspended with some placeholder values, until the system is set-up and can move to the initial mode
-        s.write("void spawn_tasks(){\n\n")
-
-    
-        s.write("\t// stop scheduler\n")
-        s.write("\tvTaskSuspendAll();\n\n")
-
-
-
-        # s.write("\tfor(int i = 0; i < N_TASKS; i++){\n\n")
-
-        # h.write("extern TaskHandle_t task_handles[N_TASKS];\n")
+        s.write("void create_tasks(){\n\n")
 
         for task in data.get("tasks"):
-            func = task.get("func")
             name = task.get("name")
             id = task.get("id")
 
-            s.write(f"\txTaskCreate( {func}, \"{name}\", 2048, NULL, 1, &task_handles[{id}] );\n")
-            s.write(f"\tvTaskSuspend( task_handles[{id}] );\n")
+            s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, NULL, 1, &task_handles[{id}] );\n")
 
-        s.write("\n\txTaskResumeAll();\n")
+        s.write("\n}\n\n")
 
-        s.write("\n}\n")
 
+
+
+        ## function for creating the task timers, afterwards started and managed by the mcmanager on startup.
+        s.write("void create_timers(){\n\n")
+
+        for task in data.get("tasks"):
+            id = task.get("id")
+
+            s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
+
+        s.write("\n}\n\n")
 
 
 

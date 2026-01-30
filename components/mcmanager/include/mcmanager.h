@@ -18,8 +18,6 @@
 #define GUARD_OFFSETMCR     (uint8_t) 2
 #define GUARD_BACKLOG       (uint8_t) 3
 
-
-// general bounds
 #define MAX_TRANS_TASKS (uint16_t)   N_TRANS * N_TASKS 
 
 
@@ -33,9 +31,6 @@ typedef struct {
 
 } task_params_t;
 
-// Structure serving as a template that holds the values for what action to perform on a job depending on its type
-// and the guard associated with it. Some fields may not be necessary for a specific type of job; those fields will
-// have value ACTION_NONE, GUARD_NONE and -1 for action, guard and guard value respectively XXX: subject to change.
 typedef struct {
 
     uint8_t     action;
@@ -47,7 +42,6 @@ typedef struct {
 typedef struct {
 
     job_primitives_t    primitives;
-    task_params_t       params;
     uint16_t            transition_id;
     uint8_t             task_id;
 
@@ -55,7 +49,7 @@ typedef struct {
 
 typedef struct {
 
-    const trans_task_t *taskset;
+    const trans_task_t      *taskset;
     uint8_t                 taskset_size;
     uint8_t                 source_mode;
     uint8_t                 dest_mode;
@@ -63,25 +57,33 @@ typedef struct {
 
 } transition_t;
 
+typedef struct {
+
+    task_params_t   parameters;
+    uint8_t         id;
+
+} mode_task_t;
+
+typedef struct {
+
+    const mode_task_t   *tasks;
+    uint8_t             n_tasks;
+    uint8_t             id;
+
+} mode_info_t;
+
 
 
 void initial_setup();
 void apply_primitive(const trans_task_t *task);
-void perform_action(TaskHandle_t handle, uint8_t action);
+void perform_action(uint8_t task_id, uint8_t action, uint8_t mode_id);
 void mc_request(uint8_t target_mode);
 
 
 
-
-
-typedef struct {
-
-    TaskHandle_t handle;
-    uint8_t action;
-
-} offsetmcr_info_t;
-
 void callback_offsetmcr_timer( TimerHandle_t xTimer );
+
+void task_timer_callback( TimerHandle_t xTimer );
 
 
 #endif // !MCMANAGER_H

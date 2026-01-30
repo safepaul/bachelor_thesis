@@ -27,18 +27,38 @@ static TickType_t mcr_instant = 0;
 
 
 
-// TODO: I think there will be a function that sets up all the system before starting the tasks, things like setting up the initial mode and similar. I need this for testing for now.
 /*
  *
  *
 */
 void initial_setup(){
+    // XXX: I have to start the timers here (and suspend the tasks that are not active in the initial mode?)
+    // For the timers, as this function is intended to prepare the systemfor the mode MODE_INIT, set all task parameters before startup so, before starting the timers (which I think is the last thing to do, as that starts the tasks and the actual system), the periods of the timers (of the tasks) have to be set up as I have decided that the timers will start with period 0 during creation.
+    // I have to turn off the timers when I change the mode
+    // - With xTimerChangePeriod (+ xTimerReset)
+    // - I think with xTimerStop, the timer stops mid-counting so with xTimerReset I can reset it back to 0
+    // - must think of a way to recognize pending tasks (if they are even necessary to recognize)
 
     current_mode = MODE_INIT;
-    printf("resuming task 0\n");
-    vTaskResume(task_handles[0]);
-    printf("resuming task 1\n");
-    vTaskResume(task_handles[1]);
+
+
+    // stop scheduler to avoid some tasks starting before others during processing
+    vTaskSuspendAll();
+
+    // set the period and priority of the timers (task periods) and tasks
+    for (int i = 0; i < modes[MODE_INIT].n_tasks; i++) {
+
+        mode_task_t init_task_i = modes[MODE_INIT].tasks[i];
+        
+        xTimerChangePeriod( timer_handles[  init_task_i.id],  init_task_i.parameters.period,   0);
+        vTaskPrioritySet(task_handles[  init_task_i.id],   init_task_i.parameters.priority  );
+        esp_rom_printf("starting task %d timer\n", i);
+        xTimerStart(timer_handles[ init_task_i.id ], 0);
+
+    }
+
+    xTaskResumeAll();
+
 
 }
 
@@ -80,6 +100,7 @@ void mc_request(uint8_t target_mode){
     xTaskResumeAll();
 
     ESP_LOGI(TAG, "Mode change successfully performed!");
+
 }
 
 
@@ -173,7 +194,20 @@ void apply_primitive(const trans_task_t *task){
 
             break;
 
+        // olvidarse de constante, preguntar long cola < 0?
         case GUARD_BACKLOG:
+            // XXX: idea:
+            // he visto que con notificaciones, el codigo de la tarea se queda quieto hasta que lo notifiquen (por lo que se podrian iniciar sin tener que suspenderlas después instantaneo).
+            // Se pueden acumular las notificaciones por lo que funciona como contador de backlog y esas tareas estarian en pending. Las notificaciones se envian con software timers cuando hago release?
+            // Como detecto que ciertas tasks están en pending? hace falta siquiera para el backlog saber que estan en pending?
+            // LEEME: hacerme preguntas -> seguir el rollo del video de ICS para psicologia. Aplicar ics bien.
+            // queue size -> max_task_notifications o parecido
+            // como hay varias operaciones posibles para el backlog, hacer defines con cada operación, pero esto crea el problema de que tendria que crear un case: en el switch para cada uno, a no ser que consiga diferenciarlos de alguna manera o encuente otro modo de hacerlo
+
+            
+
+
+            
 
             break;
 
@@ -192,7 +226,11 @@ void apply_primitive(const trans_task_t *task){
  * 
  *
 */
-void perform_action(TaskHandle_t handle, uint8_t action){
+void perform_action(uint8_t task_id, uint8_t action, uint8_t mode_id){
+    TaskHandle_t task_handle = task_handles[task_id];
+    TimerHandle_t timer_handle = timer_handles[task_id];
+
+    // Se deja que la tarea termine siempre
 
     // TODO: Check if parameter changes are needed and perform that too. Maybe adding a task type field avoids having to check if the task is C-U-N-O and makes it easier to perform the actions
     switch (action) {
@@ -205,14 +243,34 @@ void perform_action(TaskHandle_t handle, uint8_t action){
             break;
 
         case ACTION_SUSPEND:
-            vTaskSuspend(handle);
+            // stop and reset the timer (how to set back the code to the first line? reset task somehow?)
+            xTimerStop(timer_handle, 0);
+            xTimerReset(timer_handle, 0);
+            vTaskSuspend(task_handle);
             break;
 
         case ACTION_UPDATE:
+            // just change the parameters.
+            // priority
+            vTaskPrioritySet(task_handle, modes[mode_id].tasks[task_id].parameters.priority);
+            // period
+            xTimerChangePeriod(timer_handle, modes[mode_id].tasks[task_id].parameters.period, 0);
+
             break;
 
         case ACTION_RELEASE:
-            vTaskResume(handle);
+            // first change parameters
+            // priority
+            vTaskPrioritySet(task_handle, modes[mode_id].tasks[task_id].parameters.priority);
+            // period
+            xTimerChangePeriod(timer_handle, modes[mode_id].tasks[task_id].parameters.period, 0);
+
+
+
+            vTaskResume(task_handle);
+            // reset timer just in case
+            xTimerReset(timer_handle, 0);
+            xTimerStart(timer_handle, 0);
             break;
 
         default:
@@ -229,16 +287,30 @@ void perform_action(TaskHandle_t handle, uint8_t action){
  * Callbacks used for the software timers necessary for the offsetmcr guard.
  * They expect a task pointer to be passed as an argument
  *
- * NOTE: it's not the best function, as I calculate the state again to avoid creating and passing a struct to the timer
  * NOTE: I believe I am passing the task pointer as an argument that should be a timer identifier. I don't know the consequences to that
 */
 void callback_offsetmcr_timer( TimerHandle_t xTimer ){
 
-    // XXX: this printf may cause an exception if the timer expires during an mcr and the scheduler is stopped
     esp_rom_printf("Offsetmcr timer expired. Executing...\n");
 
     const trans_task_t *task = (const trans_task_t *) pvTimerGetTimerID(xTimer);
 
     perform_action(task_handles[task->task_id], task->primitives.action);
+
+}
+
+
+/*
+ *
+ *
+*/
+void task_timer_callback( TimerHandle_t xTimer ){
+
+
+    uint8_t task_id = (uint8_t)(uintptr_t)pvTimerGetTimerID(xTimer);
+
+    esp_rom_printf("notifying task %d from task timer callback!\n", task_id);
+
+    xTaskNotifyGive( task_handles[ task_id ] );
 
 }
