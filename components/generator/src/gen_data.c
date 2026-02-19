@@ -21,15 +21,15 @@ const uint8_t mode_transitions[N_MODES][N_MODES] = {
 
 static const trans_task_t trans_0_taskset[2] = {
 
-	(trans_task_t){ .transition_id = 0, .task_id = 0, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_TRUE, .guard_value = -1, } },
-	(trans_task_t){ .transition_id = 0, .task_id = 1, .primitives = (job_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
+	(trans_task_t){ .transition_id = 0, .task_id = 0, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETLR, .guard_value = 500, } },
+	(trans_task_t){ .transition_id = 0, .task_id = 1, .primitives = (job_primitives_t){ .action = ACTION_SUSPEND, .guard = GUARD_BACKLOG_ZERO, .guard_value = -1, } },
 
 };
 
 static const trans_task_t trans_1_taskset[2] = {
 
-	(trans_task_t){ .transition_id = 1, .task_id = 0, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_TRUE, .guard_value = -1, } },
-	(trans_task_t){ .transition_id = 1, .task_id = 1, .primitives = (job_primitives_t){ .action = ACTION_SUSPEND, .guard = GUARD_TRUE, .guard_value = -1, } },
+	(trans_task_t){ .transition_id = 1, .task_id = 0, .primitives = (job_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
+	(trans_task_t){ .transition_id = 1, .task_id = 1, .primitives = (job_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_BACKLOG_GLOBAL, .guard_value = -1, } },
 
 };
 
@@ -45,14 +45,14 @@ const transition_t transitions[N_TRANS] = {
 
 static const mode_task_t mode_0_tasks[2] = {
 
-	[0] = { .id = 0, .parameters = (task_params_t){ .period = 200, .priority = 10 } }, 
-	[1] = { .id = 1, .parameters = (task_params_t){ .period = 500, .priority = 10 } }, 
+	[0] = { .id = 0, .parameters = (task_params_t){ .period = 2000, .priority = 10 } }, 
+	[1] = { .id = 1, .parameters = (task_params_t){ .period = 750, .priority = 10 } }, 
 
 };
 
 static const mode_task_t mode_1_tasks[1] = {
 
-	[0] = { .id = 0, .parameters = (task_params_t){ .period = 100, .priority = 10 } }, 
+	[0] = { .id = 0, .parameters = (task_params_t){ .period = 500, .priority = 10 } }, 
 
 };
 
@@ -63,10 +63,17 @@ const mode_info_t modes[N_MODES] =  {
 
 };
 
+mcm_task_t mcm_tasks[N_TASKS] =  {
+
+	[0] = { .id = 0, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  },
+	[1] = { .id = 1, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  },
+
+};
+
 void create_tasks(){
 
-	xTaskCreate( taskZero_utask, "taskZero", 2048, NULL, 1, &task_handles[0] );
-	xTaskCreate( taskOne_utask, "taskOne", 2048, NULL, 1, &task_handles[1] );
+	xTaskCreate( taskZero_utask, "taskZero", 2048, (void*)(uintptr_t)0, 1, &task_handles[0] );
+	xTaskCreate( taskOne_utask, "taskOne", 2048, (void*)(uintptr_t)1, 1, &task_handles[1] );
 
 }
 

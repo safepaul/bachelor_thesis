@@ -27,6 +27,9 @@
 // array containing all modes and information related to them  
 extern const mode_info_t modes[N_MODES];
 
+// array containing information for the mcmanager to handle tasks internally  
+extern mcm_task_t mcm_tasks[N_TASKS];
+
 // array containing all transitions  
 extern const transition_t transitions[N_TRANS];
 

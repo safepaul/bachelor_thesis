@@ -1,8 +1,6 @@
-# guard value for offsetmcr must be in milliseconds
+# guard value for offsets must be in milliseconds
 # period 0 means task is of type old
-#
-# XXX: the thing about differentiating between pending and executing and new is that for a single task, if there's a backlog, one of its jobs may be executing, and a few of them pending
-# but how do I differentiate between executing and pending in FreeRTOS if they are both going to be in a blocked state because they can't be detected as eRunning?
+# guard value must not be -1 if it's necessary for calculation
 
 transitions:
   # 0 -> 1   MODE_INIT -> MODE_EMERGENCY
@@ -13,13 +11,13 @@ transitions:
       - task_id: 0 # changed
         primitives:
           action: "ACTION_UPDATE"
-          guard: "GUARD_TRUE"
-          guard_value: -1
-      - task_id: 1 # new
+          guard: "GUARD_OFFSETLR"
+          guard_value: 500
+      - task_id: 1 # old
         primitives:
-          action: "ACTION_RELEASE"
-          guard: "GUARD_OFFSETMCR"
-          guard_value: 3000
+          action: "ACTION_SUSPEND"
+          guard: "GUARD_BACKLOG_ZERO"
+          guard_value: -1
 
   # 1 -> 0   MODE_EMERGENCY -> MODE_INIT
   - trans_id: 1
@@ -27,18 +25,14 @@ transitions:
     dest_mode: 0
     taskset:
       - task_id: 0 # changed
-        # when does it get updated? after it finishes its execution? let it finish or change parameters while executing? does it matter?
         primitives:
           action: "ACTION_UPDATE"
-          guard: "GUARD_TRUE"
-          guard_value: -1
-      - task_id: 1 # old
-        # if task gets suspended mid execution, when it comes back it resumes at that point in execution and other problems may happen. must find a way to suspend after task finishes.
-        # I can check if it's blocked because it may have called vtaskdelay(), but many other things can block it...
+          guard: "GUARD_OFFSETMCR"
+          guard_value: 3000
+      - task_id: 1 # new
         primitives: 
-          action: "ACTION_SUSPEND"
-          guard: "GUARD_TRUE"
-          # if the guard is not none, guard value must not be -1
+          action: "ACTION_RELEASE"
+          guard: "GUARD_BACKLOG_GLOBAL"
           guard_value: -1
 
 
@@ -58,11 +52,11 @@ modes:
     active_tasks:
       - id: 0
         parameters:
-          period: 200
+          period: 2000
           priority: 10
       - id: 1
         parameters:
-          period: 500
+          period: 750
           priority: 10
 
   - id: 1
@@ -70,5 +64,5 @@ modes:
     active_tasks:
       - id: 0
         parameters:
-          period: 100
+          period: 500
           priority: 10

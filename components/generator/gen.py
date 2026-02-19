@@ -50,6 +50,10 @@ def generate():
         h.write("// array containing all modes and information related to them  \n")
         h.write("extern const mode_info_t modes[N_MODES];\n\n")
 
+        ## --- mcm tasks table ---
+        h.write("// array containing information for the mcmanager to handle tasks internally  \n")
+        h.write("extern mcm_task_t mcm_tasks[N_TASKS];\n\n")
+
         ## --- transition table ---
         h.write("// array containing all transitions  \n")
         h.write("extern const transition_t transitions[N_TRANS];\n\n")
@@ -198,6 +202,17 @@ def generate():
         s.write("\n};\n\n")
 
 
+        ## --- mcm tasks ---
+        ## initializes all fields to 0, subject to change
+        s.write("mcm_task_t mcm_tasks[N_TASKS] =  {\n\n")
+
+        for task in range(n_tasks+1):
+
+            s.write(f"\t[{task}] = {{ .id = {task}, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  }},\n")
+
+        s.write("\n};\n\n")
+
+
 
         ## function for spawning the tasks, all suspended with some placeholder values, until the system is set-up and can move to the initial mode
         s.write("void create_tasks(){\n\n")
@@ -206,7 +221,7 @@ def generate():
             name = task.get("name")
             id = task.get("id")
 
-            s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, NULL, 1, &task_handles[{id}] );\n")
+            s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, (void*)(uintptr_t){id}, 1, &task_handles[{id}] );\n")
 
         s.write("\n}\n\n")
 
