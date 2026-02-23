@@ -65,8 +65,8 @@ const mode_info_t modes[N_MODES] =  {
 
 mcm_task_t mcm_tasks[N_TASKS] =  {
 
-	[0] = { .id = 0, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  },
-	[1] = { .id = 1, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  },
+	[0] = { .id = 0, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0, .last_period = 0  },
+	[1] = { .id = 1, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0, .last_period = 0  },
 
 };
 

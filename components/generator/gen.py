@@ -208,7 +208,7 @@ def generate():
 
         for task in range(n_tasks+1):
 
-            s.write(f"\t[{task}] = {{ .id = {task}, .is_waiting = 0, .backlog = 0, .last_release = 0, .last_period = 0  }},\n")
+            s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0, .last_period = 0  }},\n")
 
         s.write("\n};\n\n")
 

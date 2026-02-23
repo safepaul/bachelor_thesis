@@ -32,19 +32,9 @@ static TickType_t mcr_instant = 0;
  *
 */
 void initial_setup(){
-    // XXX:
-    // I have to turn off the timers when I change the mode
-    // - With xTimerChangePeriod (+ xTimerReset)
-    // - I think with xTimerStop, the timer stops mid-counting so with xTimerReset I can reset it back to 0
-    //
     // NOTE: can create the timers directly with the initial values and skip part of this setup
 
     current_mode = MODE_INIT;
-
-
-    // stop scheduler to avoid some tasks starting before others during processing
-    // vTaskSuspendAll();
-
 
     // set the period and priority of the timers (task periods) and tasks
     for (int i = 0; i < modes[MODE_INIT].n_tasks; i++) {
@@ -66,9 +56,6 @@ void initial_setup(){
 
     }
 
-
-    // xTaskResumeAll();
-
 }
 
 
@@ -81,13 +68,6 @@ void mc_request(uint8_t target_mode){
     // calculate the mcr instant just after receiving the mc request
     mcr_instant = xTaskGetTickCount();
 
-    printf("-------------- MCR INSTANT: %lu\n\n", mcr_instant);
-
-    // stop the scheduler so that the states of the tasks don't change while the program processes the transition of the tasks that come before (or even the state snapshot)
-    // this must be the first call to avoid a higher priority task taking over the cpu (not too sure about this, mcr_instant gets delayed...)
-    // vTaskSuspendAll();
-
-
     // fetch the transition that corresponds to the 'source -> dest' mode pair
     uint8_t current_trans_id = mode_transitions[current_mode][target_mode];
 
@@ -95,19 +75,11 @@ void mc_request(uint8_t target_mode){
     if (current_trans_id == NO_TRANSITION)
         abort();
 
-    const transition_t *current_trans = &transitions[ current_trans_id ];
-
-
-    // perform the task changes
-    for (int i = 0; i < current_trans->taskset_size; i++) {
-        apply_primitive(&current_trans->taskset[i]);
-    }
-
+    // perform transition (state-based)
+    mcm_perform_transition(current_trans_id);
     
     // after all tasks have been handled correctly, change the current mode and resume the scheduler
     current_mode = target_mode;
-
-    // xTaskResumeAll();
 
     ESP_LOGI(TAG, "Mode change successfully performed!");
 
@@ -119,196 +91,179 @@ void mc_request(uint8_t target_mode){
  *
  *
 */
-void apply_primitive(const trans_task_t *task){
+void mcm_perform_transition(uint8_t trans_id){
 
+    // stop all taskset timers (all active tasks); we dont want new jobs releasing while processing.
+    for (int i = 0; i < transitions[trans_id].taskset_size; i++) {
+        uint8_t task_id = transitions[trans_id].taskset[i].task_id;
+        xTimerStop(timer_handles[task_id], 0);
+    }
 
-    // NOTE: I removed the distinction between jobs executing or not executing because as I also removed the distinction between pending and other job states, just by knowing the type of task we know they can only be in one state:
-    //  - if the task is of type NEW: so it can only be in a non-executing state (suspended)
-    //  - if the task is of type UNCHANGED, CHANGED, or OLD: the task HAS TO BE already in an executing state (ready, blocked, running).
-    // The program loses granularity but for simplicity I'll leave it like this, adding features will be fine.
-    // The program itself doesnt care about the type of the task, it just cares about performing the changes. The user that generates the YAML must take care of that. If a task is of type OLD, it should follow its corresponding "ACTION_ABORT" action or similar
-    // although this hurts program readability. May complicate things if I have to assert in the generator or check for errors. I'll add that later if necessary.
+    for (int i = 0; i < transitions[trans_id].taskset_size; i++) {
 
+        const trans_task_t *task = &transitions[trans_id].taskset[i];
 
-    TaskHandle_t handle = task_handles[task->task_id];
-    uint8_t action = task->primitives.action;
-    uint8_t guard = task->primitives.guard;
-    int16_t guard_value = task->primitives.guard_value;
+        switch (task->primitives.guard) {
 
-    printf("task id: %d\nhandle: %p\naction: %d\nguard: %d\nguard_value: %d\n", task->task_id, handle, action, guard, guard_value);
+            case GUARD_TRUE:
+            case GUARD_NONE:
 
-    switch (guard) {
-
-        case GUARD_TRUE:
-        case GUARD_NONE:
-
-            perform_action(task->task_id, action, transitions[task->transition_id].dest_mode);
-
-            break;
-
-        case GUARD_OFFSETMCR:
-            // NOTE: because the scheduler is stopped, we dont have to worry about taking into account the processing time of the tasks that come before others sequentially
-            
-            // stop the timer, because after the mcr is done and the scheduler starts again, the offset may be greater than the last_period, so while the action is
-            // delayed, executions of the previous timer will occur. The timer will be restarted when calling xTimerChangePeriod or reset in the actions section.
-            xTimerStop(timer_handles[task->task_id], 0);
-
-            // calculate release timestamp
-            TickType_t mcr_release_timestamp = mcr_instant  +  pdMS_TO_TICKS(guard_value); 
-
-            // delay the task for the difference between the timestamp and the actual time.
-            TickType_t mcr_delay = mcr_release_timestamp - xTaskGetTickCount();
-
-            // creating the timer for the job to be relased after the mcr delay
-            TimerHandle_t omcr_timer_handle = xTimerCreate("offsetmcr_timer", mcr_delay, pdFALSE, (void *)task, callback_offset_timer);
-
-
-            // if the difference is 0 or less, release instantly. this could happen if the offset is smaller than the old period ->
-            // last_period = 100, last_release = 1000, mcr_instant at 1060, offset = 30:: offset + lr = 1030, mcr_instant 1060, difference = -30
-            if (mcr_delay <= 0) {
-                xTimerStart(omcr_timer_handle, 0);
-                break;
-            }
-
-            // releases the task after the lr_delay
-            xTimerStart(omcr_timer_handle, 0);
-            break;
-
-            break;
-
-        case GUARD_BACKLOG_ZERO:
-
-            TickType_t delay_local = 0;
-
-            while (1) {
-
-                // IF task backlog = 0, break from the loop and apply action
-                if ( mcm_tasks[task->task_id].backlog == 0 )
+                // if it was already waiting (with all its jobs finished or inactive), perform action
+                if (mcm_tasks[task->task_id].state == STATE_WAITING_FOR_RELEASE) {
+                    perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
                     break;
-                // ELSE wait until it finishes, or timeout and clean
-                else {
-
-                    // TODO: add a timeout routine and clean whatever is needed
-                    if (delay_local >= 40) {
-                        abort();
-                    }
-                    
-
-                    // try again in 10ms XXX: is this too much waiting time?
-                    vTaskDelay(pdMS_TO_TICKS(10));
-
-                    delay_local = delay_local + 10;
-                    
                 }
-                
-            }
-
-            perform_action(task->task_id, action, transitions[task->transition_id].dest_mode);
-
-
-
-            
-
-            break;
-
-
-        case GUARD_BACKLOG_GLOBAL:
-            // Check if the sum of the backlogs of all active tasks is 0 
-
-            TickType_t delay_global = 0;
-
-            while (1) {
-
-                uint16_t global_backlog = 0;
-
-                // sum all backlogs of the active tasks
-                for (uint8_t i = 0; i < modes[current_mode].n_tasks; i++) {
-                    global_backlog += mcm_tasks[ modes[current_mode].tasks[i].id ].backlog;
-                }
-
-                // IF global backlog = 0, break from the loop and apply action
-                if ( global_backlog == 0 )
+                // if it was executing, clean its backlog to 1 to let the running job finish, and perform action
+                else if (mcm_tasks[task->task_id].state == STATE_RELEASED) {
+                    mcm_clean_backlog(task->task_id);
+                    perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
                     break;
-                // ELSE wait until it finishes, or timeout and clean
-                else {
-
-                    // TODO: add a timeout routine and clean whatever is needed
-                    if (delay_global >= 200) {  //XXX: is this too much waiting time?
-                        abort();
-                    }
-
-                    // try again in 20ms XXX: is this too much waiting time?
-                    vTaskDelay(pdMS_TO_TICKS(20));
-
-                    delay_global = delay_global + 10;
-                    
                 }
-                
-            }
+                // this should not happen
+                else{
+                    abort();
+                }
 
-            // TODO: add a macro for this? it repeats in the whole switch statement
-            perform_action(task->task_id, action, transitions[task->transition_id].dest_mode);
-
-            break;
-
-
-        case GUARD_OFFSETLR:
-            // meaning:
-            //  - apply action X milliseconds after its last release
-            //
-            // use cases:
-            //  - for changed or unchanged tasks:
-            //      - as the last_release will be known, this is used for jobs that changed their parameters and want to be executed instantly after the mode change, or
-            //      maybe having their first execution after the mode change to have the new period, instead of their first execution after the mode change being the old period.
-            //      If old_period was 50, last_release was 1000 and new period is 200, they want the new execution at 1200 instead of at 1050.
-            //
-            //  - for new tasks: (probably wont be used here)
-            //      - ACTION_RELEASE. last release of new tasks will be (CURRENT_TICKS mod LAST_RELEASE), meaning, the last time it would have been released
-            //      if it had been active all the time. And add the offset to that so release in (ticksToMs(last_release) + offset) milliseconds.
-            //
-            //  - for old tasks (should not be used with old tasks, just with ACTION_NONE)
-
-            // stop the timer, because after the mcr is done and the scheduler starts again, the offset may be greater than the last_period, so while the action is
-            // delayed, executions of the previous timer will occur. The timer will be restarted when calling xTimerChangePeriod or reset in the actions section.
-            xTimerStop(timer_handles[task->task_id], 0);
-
-
-            // TODO: add support for new tasks (calculate theoretical last release with modulo) (probably unneccessary)
-            //
-            // release at last_release + offset
-            TickType_t lr_release_timestamp = mcm_tasks[task->task_id].last_release  +  pdMS_TO_TICKS(guard_value); 
-
-            // delay the task for the difference between the timestamp and the actual time.
-            TickType_t lr_delay = lr_release_timestamp - xTaskGetTickCount();
-
-
-            // creating the timer for the job to be relased after the lr delay
-            TimerHandle_t olr_timer_handle = xTimerCreate("offsetlr_timer", lr_delay, pdFALSE, (void *)task, callback_offset_timer);
-
-
-            // if the difference is 0 or less, release instantly. this could happen if the offset is smaller than the old period ->
-            // last_period = 100, last_release = 1000, mcr_instant at 1060, offset = 30:: offset + lr = 1030, mcr_instant 1060, difference = -30
-            if (lr_delay <= 0) {
-                xTimerStart(olr_timer_handle, 0);
                 break;
-            }
 
-            // releases the task after the lr_delay
-            xTimerStart(olr_timer_handle, 0);
-            break;
+            // the code is the same
+            case GUARD_BACKLOG_ZERO:
+            case GUARD_BACKLOG_GLOBAL:
+
+                // if the task is already waiting, it means it finished executing and is waiting for its period or it's a new task, so we can release it instantly
+                if (mcm_tasks[task->task_id].state == STATE_WAITING_FOR_RELEASE) {
+                    perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
+                }
+                // if the task is released it means that at the mcr instant it has backlog >= 1, so we have set its state to waiting and check back again
+                else if (mcm_tasks[task->task_id].state == STATE_RELEASED) {
+                    if (task->primitives.guard == GUARD_BACKLOG_ZERO)
+                        mcm_tasks[task->task_id].state = STATE_WAITING_FOR_BACKLOG_Z;
+                    else
+                        mcm_tasks[task->task_id].state = STATE_WAITING_FOR_BACKLOG_G;
+
+                }
+                // this should not happen
+                else {
+                    abort();
+                    // TODO: maybe if an mcr happens while some task is waiting for its timer we have to take other actions.
+                }
+
+                break;
+
+            // almost the same code
+            case GUARD_OFFSETMCR:
+            case GUARD_OFFSETLR:
+
+                TickType_t delay = 0;
+
+                if (task->primitives.guard == GUARD_OFFSETMCR)
+                    delay = mcm_calculate_offset_delay(task->primitives.guard_value, mcr_instant);
+                else
+                    delay = mcm_calculate_offset_delay(task->primitives.guard_value, mcm_tasks[task->task_id].last_release);
 
 
+                // if already waiting, create the one-shot timer with the calculated offset (done after)
+                // it it's executing, clean its backlog to let the last job finish and create the one-shot timer
+                if (mcm_tasks[task->task_id].state == STATE_RELEASED) {
+                    mcm_clean_backlog(task->task_id);
+                }
 
-        default:
-            abort();
-            break;
+
+                // if the difference is 0 or less, release instantly. 
+                if (delay <= 0) {
+                    perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
+                    break;
+                }
+
+                // creating the timer for the job to be relased after the lr delay
+                TimerHandle_t offset_timer_handle = xTimerCreate("offsetlr_timer", delay, pdFALSE, (void *)task, callback_offset_timer);
+
+                // releases the task after the lr_delay
+                xTimerStart(offset_timer_handle, 0);
+
+                // set the new state
+                mcm_tasks[task->task_id].state = STATE_WAITING_FOR_OFFSETLR;
+
+                break;
+
+            default:
+                abort();
+                break;
+
+        }
 
     }
 
+    // the way the loop exits is, it loops through all tasks and if it is "handled", it adds one to the count. If count == n_tasks, it exits. There may be an issue where the loop releases the last
+    // task but its state hasn't changed yet, so it has to loop once more. Probably a bad design but may work.
+    uint8_t handled_tasks;
+
+    // loop until all tasks are handled
+    while (1) {
+
+        handled_tasks = 0;
+        
+        // loop through all tasks again, but only cares for the backlog states
+        for (int i = 0; i < transitions[trans_id].taskset_size; i++) {
+
+            const trans_task_t *task = &transitions[trans_id].taskset[i];
+            
+            // chooses sequentially
+            switch (mcm_tasks[task->task_id].state) {
+
+                case STATE_WAITING_FOR_BACKLOG_G:
+
+                    uint16_t global_backlog = 0;
+
+                    // sum all backlogs of the active tasks
+                    for (uint8_t i = 0; i < modes[current_mode].n_tasks; i++) {
+                        global_backlog += mcm_tasks[ modes[current_mode].tasks[i].id ].backlog;
+                    }
+
+                    // apply action if the global backlog is 0 and is not running
+                    if (global_backlog == 0 && mcm_tasks[task->task_id].state == STATE_WAITING_FOR_RELEASE) {
+
+                        // TODO: stop the timer?
+                        perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
+
+                    }
+                    // if it's not 0, check in next iteration
+
+                    break;
+
+                case STATE_WAITING_FOR_BACKLOG_Z:
+
+                    // apply action if the task backlog is 0 and is not running
+                    if ( mcm_tasks[task->task_id].backlog == 0 && mcm_tasks[task->task_id].state == STATE_WAITING_FOR_RELEASE) {
+                        // TODO: add a macro for this? it repeats in the whole switch statement
+                        perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
+
+                    }
+                    // if it's not 0, check in next iteration
+
+                    break;
+                    
+                // if not backlog state, check next
+                default:
+                    handled_tasks++;
+                    break;
+
+            }
+
+        }
+
+        // if all tasks have been handled, exit loop
+        if (handled_tasks == transitions[trans_id].taskset_size)
+            break;
+
+        // wait 5ms, this blocks the main task, i dont know if this will give problems. 
+        // Theoretically, until this loops finishes with all tasks, there shouldn't be an additional mcr 
+        // TODO: add a timeout
+        vTaskDelay(pdMS_TO_TICKS(5));
+
+    }
 
 }
-
-
 
 /*
  * 
@@ -318,14 +273,11 @@ void perform_action(uint8_t task_id, uint8_t action, uint8_t mode_id){
     TaskHandle_t task_handle = task_handles[task_id];
     TimerHandle_t timer_handle = timer_handles[task_id];
 
-    // TODO: Check if parameter changes are needed and perform that too. Maybe adding a task type field avoids having to check if the task is C-U-N-O and makes it easier to perform the actions
     switch (action) {
         case ACTION_NONE:
-            // do nothing?
-            break;
-
         case ACTION_CONTINUE:
-            // do nothing?
+            // start timer again, as they are stopped during the mcr()
+            xTimerStart(timer_handle, 0);
             break;
 
         case ACTION_SUSPEND:
@@ -369,23 +321,10 @@ void perform_action(uint8_t task_id, uint8_t action, uint8_t mode_id){
  *
  *
 */
-void mcm_wait_for_activation(uint8_t task_id){
+void mcm_wait_for_release(uint8_t task_id){
 
-    // if execution reaches here, it means the task is waiting for its activation
-    mcm_tasks[task_id].is_waiting = true;
-
-
-    /*
-     * ???: what conditions have to be met to release a job that called wfa()?
-     *  - 1. the task should be active in the current mode.
-     *  - 2. on first release, they depend on their guard. After that, they depend on their period, and maybe on other parameters
-     *
-     *
-     *  all tasks call ulTaskNotifyTake, only the active ones get notified?
-     *   - [?] do I use task states for anything? -> ulTaskNotifyTake will leave them in the blocked state
-     *
-    */
-
+    // if execution reaches here, it means the task is waiting for its release
+    mcm_tasks[task_id].state = STATE_WAITING_FOR_RELEASE;
 
     // jobs wait for their activation here
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
@@ -394,7 +333,7 @@ void mcm_wait_for_activation(uint8_t task_id){
     mcm_tasks[task_id].backlog -= 1;
 
     // after the task takes its notification, it means it is not waiting anymore
-    mcm_tasks[task_id].is_waiting = false;
+    mcm_tasks[task_id].state = STATE_RELEASED;
 
     // update the last_release and last_period values values only once we know they have been released to avoid updating them when the task is notified instead of when it's released
     // ---> just after the task takes the notification.
@@ -421,9 +360,37 @@ void mcm_release_job(uint8_t task_id){
     //  I increment before the call because if I call then increment, the decrement in wfa() may occur before the increment and cause backlog to be 255 for a moment.
     //  Maybe if something happens between the increment and the notification, it could signal a backlog increment when there should not be and the program may get stuck
     //  in an infinite waiting time (or a timeout), but thay may be very unlikely (?)
+    
+    // releasing doesnt mean instantly executing, but adding a job to its backlog
     mcm_tasks[task_id].backlog += 1;
     xTaskNotifyGive( task_handles[ task_id ] );
 
+}
+
+/*
+ *
+ *
+*/
+void mcm_clean_backlog(uint8_t task_id){
+
+    ulTaskNotifyValueClear(task_handles[task_id], 0xFFFFFFFF);
+    mcm_tasks[task_id].backlog = 0;
+
+}
+
+/*
+ *
+ *
+*/
+TickType_t mcm_calculate_offset_delay(uint16_t offset, TickType_t offset_reference){
+
+    // release at offset timestamp + offset
+    TickType_t release_timestamp = offset_reference  +  pdMS_TO_TICKS(offset); 
+
+    // delay the task for the difference between the timestamp and the actual time.
+    TickType_t delay = release_timestamp - xTaskGetTickCount();
+
+    return delay;
 }
 
 
@@ -442,6 +409,10 @@ void callback_offset_timer( TimerHandle_t xTimer ){
 
     perform_action(task->task_id, task->primitives.action, transitions[task->transition_id].dest_mode);
 
+
+    // TODO: right now using auto-deletion. I could use an array of offset timers for each task and recycle them by, instead of creating and deleting them every time, just change their
+    // period. It is faster as no heap allocations are done at runtime. Will do later.
+    xTimerDelete(xTimer, 0);
 }
 
 
