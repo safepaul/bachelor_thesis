@@ -31,7 +31,7 @@ extern const mode_info_t modes[N_MODES];
 extern mcm_task_t mcm_tasks[N_TASKS];
 
 // array containing all transitions  
-extern const transition_t transitions[N_TRANS];
+extern const mcm_transition_t transitions[N_TRANS];
 
 // lookup table (2d array) containing the id's of the transitions corresponding to each mode pair
 // mode_transitions[i][j] means the transition id that goes from mode i to mode j 

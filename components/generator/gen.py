@@ -56,7 +56,7 @@ def generate():
 
         ## --- transition table ---
         h.write("// array containing all transitions  \n")
-        h.write("extern const transition_t transitions[N_TRANS];\n\n")
+        h.write("extern const mcm_transition_t transitions[N_TRANS];\n\n")
 
         h.write("// lookup table (2d array) containing the id's of the transitions corresponding to each mode pair\n")
         h.write("// mode_transitions[i][j] means the transition id that goes from mode i to mode j \n")
@@ -140,12 +140,12 @@ def generate():
             taskset = transition.get("taskset")
             taskset_size = len(taskset)
 
-            s.write(f"static const trans_task_t trans_{trans_id}_taskset[{taskset_size}] = {{\n\n")
+            s.write(f"static const mcm_transition_task_t trans_{trans_id}_taskset[{taskset_size}] = {{\n\n")
 
             for task in taskset:
                 primitives = task.get("primitives")
 
-                s.write(f"\t(trans_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .primitives = (job_primitives_t){{ ")
+                s.write(f"\t(mcm_transition_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .primitives = (mcm_task_primitives_t){{ ")
                 s.write(f".action = {primitives.get("action", "ACTION_NONE")}, ")
                 s.write(f".guard = {primitives.get("guard", "GUARD_NONE")}, ")
                 s.write(f".guard_value = {primitives.get("guard_value", -1)}, ")
@@ -155,7 +155,7 @@ def generate():
 
 
         ## --- transition table ---
-        s.write("const transition_t transitions[N_TRANS] = {\n\n")
+        s.write("const mcm_transition_t transitions[N_TRANS] = {\n\n")
 
         for transition in data.get("transitions"):
             trans_id = transition.get("trans_id")
@@ -178,19 +178,19 @@ def generate():
             tasks = mode.get("active_tasks")
             n_tasks = len(tasks)
 
-            s.write(f"static const mode_task_t mode_{mode_id}_tasks[{n_tasks}] = {{\n\n")
+            s.write(f"static const mcm_mode_task_t mode_{mode_id}_tasks[{n_tasks}] = {{\n\n")
 
             count = 0
             for task in tasks:
                 parameters = task.get("parameters")
-                s.write(f"\t[{count}] = {{ .id = {task.get("id")}, .parameters = (task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }} }}, \n") 
+                s.write(f"\t[{count}] = {{ .id = {task.get("id")}, .parameters = (mcm_task_params_t){{ .period = {parameters.get("period")}, .priority = {parameters.get("priority")} }} }}, \n") 
                 count += 1
 
             s.write("\n};\n\n")
 
 
         ## --- mode table ---
-        s.write("const mode_info_t modes[N_MODES] =  {\n\n")
+        s.write("const mcm_mode_info_t modes[N_MODES] =  {\n\n")
 
         for mode in data.get("modes"):
             mode_id = mode.get("id")
@@ -203,12 +203,23 @@ def generate():
 
 
         ## --- mcm tasks ---
+        def is_task_in_mode_init(task_id):
+            modes = data.get("modes")
+            mode_init = modes[0]
+            active_tasks = mode_init.get("active_tasks")
+            for task in active_tasks:
+                params = task.get("parameters")
+                if task.get("id") == task_id:
+                    return (True, params.get("period"), params.get("priority")) 
+            return (False, 1, 1)
+
+
         ## initializes all fields to 0, subject to change
         s.write("mcm_task_t mcm_tasks[N_TASKS] =  {\n\n")
 
         for task in range(n_tasks+1):
 
-            s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0, .last_period = 0  }},\n")
+            s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 }},\n")
 
         s.write("\n};\n\n")
 
@@ -220,11 +231,21 @@ def generate():
         for task in data.get("tasks"):
             name = task.get("name")
             id = task.get("id")
+            is_initial, _, priority = is_task_in_mode_init(id)
+            
+            if(is_initial):
+                s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, (void*)(uintptr_t){id}, {priority}, &task_handles[{id}] );\n")
+            else:
+                s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, (void*)(uintptr_t){id}, 1, &task_handles[{id}] );\n")
 
-            s.write(f"\txTaskCreate( {name}_utask, \"{name}\", 2048, (void*)(uintptr_t){id}, 1, &task_handles[{id}] );\n")
+
 
         s.write("\n}\n\n")
 
+
+
+
+        ## --- mcm timers ---
 
 
 
@@ -232,9 +253,16 @@ def generate():
         s.write("void create_timers(){\n\n")
 
         for task in data.get("tasks"):
-            id = task.get("id")
+            task_id = task.get("id")
+            is_initial, period, _ = is_task_in_mode_init(task_id);
+            # if task is in initial mode, start the timer with initial values
+            if(is_initial):
+                s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", {period}, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
+            else:
+                s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
 
-            s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
+
+
 
         s.write("\n}\n\n")
 
