@@ -1,7 +1,6 @@
 #include "mcm_trans.h"
 #include "mcm_types.h"
 #include "gen_data.h"
-#include "portmacro.h"
 
 
 
@@ -93,40 +92,6 @@ void mcm_trans_handle_guard_backlog(const mcm_transition_task_t *task, const uin
         abort();
         // TODO: maybe if an mcr happens while some task is waiting for
         // its timer we have to take other actions.
-    }
-}
-
-
-
-
-void mcm_trans_poll_backlogs(const uint8_t trans_id, const uint8_t current_mode, const uint8_t guard)
-{
-    // loop until all tasks are handled
-    while (1)
-    {
-        uint8_t handled_tasks = 0;
-
-        // loop through all tasks again, but only cares for the backlog states
-        for (int i = 0; i < transitions[trans_id].taskset_size; i++)
-        {
-            const mcm_transition_task_t *task = &transitions[trans_id].taskset[i];
-            const mcm_task_state_t task_state = mcm_tasks[task->task_id].state;
-
-            uint16_t backlog;
-            if      (task_state == STATE_WAITING_FOR_BACKLOG_G)
-                backlog = mcm_trans_calculate_global_backlog(current_mode);
-            else if (task_state == STATE_WAITING_FOR_BACKLOG_Z) 
-                backlog = mcm_tasks[task->task_id].backlog;
-            else
-                handled_tasks++;
-        }
-
-        // if all tasks have been handled, exit loop
-        if (handled_tasks == transitions[trans_id].taskset_size)
-            break;
-
-        // TODO: add a timeout
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

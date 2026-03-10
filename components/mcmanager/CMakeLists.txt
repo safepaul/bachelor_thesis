@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "src/mcmanager.c"
+    SRCS "src"
     INCLUDE_DIRS "include"
-    PRIV_REQUIRES generator
+    REQUIRES generator
 )

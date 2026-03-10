@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "mcm_types.h"
+#include "portmacro.h"
 
 #define MAX_TRANS_TASKS (uint16_t)   N_TRANS * N_TASKS 
 #define BACKLOG_MAX     (uint8_t)    5

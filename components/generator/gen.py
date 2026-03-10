@@ -48,7 +48,7 @@ def generate():
 
         ## --- mode table ---
         h.write("// array containing all modes and information related to them  \n")
-        h.write("extern const mode_info_t modes[N_MODES];\n\n")
+        h.write("extern const mcm_mode_info_t modes[N_MODES];\n\n")
 
         ## --- mcm tasks table ---
         h.write("// array containing information for the mcmanager to handle tasks internally  \n")
@@ -94,6 +94,7 @@ def generate():
         # include directives
         s.write("#include \"gen_data.h\"\n")
         s.write("#include \"mcmanager.h\"\n")
+        s.write("#include \"mcm_types.h\"\n")
         s.write("#include \"stddef.h\"\n")
         s.write("#include \"tasks.h\"\n")
         s.write("\n\n")
@@ -257,9 +258,9 @@ def generate():
             is_initial, period, _ = is_task_in_mode_init(task_id);
             # if task is in initial mode, start the timer with initial values
             if(is_initial):
-                s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", {period}, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
+                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", {period}, pdTRUE, (void*)(uintptr_t){task_id}, task_timer_callback );\n")
             else:
-                s.write(f"\ttimer_handles[{id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){id}, task_timer_callback );\n")
+                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, task_timer_callback );\n")
 
 
 

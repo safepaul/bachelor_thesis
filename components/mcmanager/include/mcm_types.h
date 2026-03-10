@@ -2,6 +2,7 @@
 #define MCM_TYPES_H
 
 #include <stdint.h>
+#include "freertos/idf_additions.h"
 #include "portmacro.h"
 
 
@@ -86,6 +87,15 @@ typedef struct
     uint8_t             n_tasks;
     uint8_t             id;
 } mcm_mode_info_t;
+
+typedef struct
+{
+    uint8_t             ***mode_transitions;
+    mcm_transition_t    **transitions;
+    mcm_mode_info_t     **mode_tasks;
+    TimerHandle_t       **timer_handles;
+    TaskHandle_t        **task_handles;
+} mcm_config_t;
 
 
 #endif // !MCM_TYPES_H

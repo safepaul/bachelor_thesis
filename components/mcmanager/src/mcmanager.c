@@ -6,7 +6,6 @@
 #include "stdlib.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #include "gen_data.h"
 #include "mcm_types.h"
@@ -19,12 +18,12 @@ static TickType_t mcr_instant = 0;
 
 static uint8_t current_mode = MODE_INIT;
 
-void initial_setup()
+void mcm_initial_setup()
 {
     // start the timers
     for (int i = 0; i < modes[MODE_INIT].n_tasks; i++)
     {
-        uint8_t *task_id = &modes[MODE_INIT].tasks[i].task_id;
+        uint8_t *task_id = &modes[MODE_INIT].tasks[i].id;
         xTimerStart(timer_handles[*task_id], pdMS_TO_TICKS(5));
     }
 }
@@ -71,7 +70,7 @@ void mcm_perform_transition(const uint8_t trans_id)
             abort();
     }
 
-    mcm_trans_poll_backlogs(trans_id, current_mode, guard);
+    //mcm_trans_poll_backlogs(trans_id, current_mode, guard);
 }
 
 
@@ -99,8 +98,7 @@ void mcm_perform_action(const uint8_t task_id, const uint8_t action, const uint8
         break;
 
         case ACTION_RELEASE:
-            // TODO: Right now it's redundant, check if it's necessary
-            // beforehand
+            // TODO: Right now it's redundant, check if it's necessary beforehand
             mcm_change_parameters(task_id, mode_id);
             mcm_release_job(task_id);
         break;
