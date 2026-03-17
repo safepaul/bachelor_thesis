@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "src"
+    SRCS "src/"
     INCLUDE_DIRS "include"
-    REQUIRES generator
+    PRIV_REQUIRES
 )

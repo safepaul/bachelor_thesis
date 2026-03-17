@@ -1,9 +1,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "mcmanager.h"
-#include "tasks.h"
 #include "freertos/idf_additions.h"
+
+#include "tasks.h"
+#include "mcmanager.h"
 
 
 void taskZero_utask(void *pvParameters)

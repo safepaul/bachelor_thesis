@@ -5,16 +5,10 @@
 
 void app_main(void)
 {
+    mcm_init();
 
-    // tasks are created and wait at wfa()
-    create_tasks();
-
-    // timers are created but not started
-    create_timers();
-
-    // set mode to MODE_INIT (0). Starts the timers
-    mcm_initial_setup();
-
+    /*
+    
     // after 6 seconds, mode change request MODE_INIT -> MODE_EMERGENCY (0 -> 1)
     sleep(6);
     printf("[DEBUG] executing mc request: source = %d,  dest = %d \n",
@@ -30,4 +24,6 @@ void app_main(void)
     printf("[DEBUG] executing mc request: source = %d,  dest = %d \n",
            MODE_EMERGENCY, MODE_INIT);
     mcm_mc_request(MODE_INIT);
+
+    */
 }

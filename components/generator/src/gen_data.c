@@ -1,23 +1,23 @@
-#include "gen_data.h"
-#include "mcmanager.h"
-#include ""
 #include "stddef.h"
 #include "tasks.h"
+#include "freertos/idf_additions.h"
+#include "gen_data.h"
+#include "mcmanager.h"
+#include "mcm_types.h"
 
 
 TaskHandle_t task_handles[N_TASKS];
+SemaphoreHandle_t semaphore_handles[N_TASKS];
 TimerHandle_t timer_handles[N_TASKS];
 
 
 
-const uint8_t mode_transitions[N_MODES][N_MODES] = {
-
-	[0][0] = NO_TRANSITION,
-	[0][1] = 0,
-	[1][0] = 1,
-	[1][1] = NO_TRANSITION,
-
-
+const uint8_t mode_transitions[N_MODES * N_MODES] =
+{
+	[0] = NO_TRANSITION,
+	[1] = 0,
+	[2] = 1,
+	[3] = NO_TRANSITION,
 };
 
 static const mcm_transition_task_t trans_0_taskset[2] = {
@@ -57,17 +57,17 @@ static const mcm_mode_task_t mode_1_tasks[1] = {
 
 };
 
-const mcm_mode_info_t modes[N_MODES] =  {
+const mcm_mode_t modes[N_MODES] =  {
 
 	[0] = { .id = 0, .n_tasks = 2, .tasks = mode_0_tasks  },
 	[1] = { .id = 1, .n_tasks = 1, .tasks = mode_1_tasks  },
 
 };
 
-mcm_task_t mcm_tasks[N_TASKS] =  {
+mcm_task_t tasks[N_TASKS] =  {
 
-	[0] = { .id = 0, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 },
-	[1] = { .id = 1, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 },
+	[0] = { .id = 0, .backlog = 0, .last_release = 0 },
+	[1] = { .id = 1, .backlog = 0, .last_release = 0 },
 
 };
 
@@ -78,9 +78,27 @@ void create_tasks(){
 
 }
 
-void create_timers(){
-
-	timer_handles[0] = xTimerCreate( "taskZero_timer", 2000, pdTRUE, (void*)(uintptr_t)0, task_timer_callback );
-	timer_handles[1] = xTimerCreate( "taskOne_timer", 750, pdTRUE, (void*)(uintptr_t)1, task_timer_callback );
-
+void create_semaphores()
+{
+	semaphore_handles[0] = xSemaphoreCreateCounting(LIMIT_BACKLOG , 0);
+	semaphore_handles[1] = xSemaphoreCreateCounting(LIMIT_BACKLOG , 0);
 }
+
+mcm_config_t sys_config = 
+{
+	.n_tasks = N_TASKS,
+	.n_modes = N_MODES,
+	.n_trans = N_TRANS,
+	.tasks = tasks,
+	.modes = modes,
+	.transitions = transitions,
+	.mode_transitions = mode_transitions,
+};
+
+void mcm_init()
+{
+	create_tasks();
+	create_semaphores();
+	mcm_initial_setup(&sys_config, MODE_INIT);
+};
+

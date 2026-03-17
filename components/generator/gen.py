@@ -24,7 +24,8 @@ def generate():
         h.write("#define GEN_DATA_H\n\n")
 
         h.write("\n\n")
-        h.write("#include \"mcmanager.h\"\n\n\n")
+        h.write("#include \"freertos/idf_additions.h\"\n")
+        h.write("#include \"mcm_types.h\"\n\n\n")
         h.write("\n// macros for the modes\n")
 
         # generate mode macros
@@ -36,6 +37,7 @@ def generate():
         h.write(f"#define N_TASKS {n_tasks}\n")
         h.write(f"#define N_TRANS {n_trans}\n")
         h.write(f"#define N_MODES {n_modes}\n")
+        h.write("#define LIMIT_BACKLOG (uint8_t) 5\n")
 
         h.write("\n")
         h.write("// macro for declaring that a transition doesn't exist or hasn't been found\n")
@@ -48,11 +50,11 @@ def generate():
 
         ## --- mode table ---
         h.write("// array containing all modes and information related to them  \n")
-        h.write("extern const mcm_mode_info_t modes[N_MODES];\n\n")
+        h.write("extern const mcm_mode_t modes[N_MODES];\n\n")
 
         ## --- mcm tasks table ---
         h.write("// array containing information for the mcmanager to handle tasks internally  \n")
-        h.write("extern mcm_task_t mcm_tasks[N_TASKS];\n\n")
+        h.write("extern mcm_task_t tasks[N_TASKS];\n\n")
 
         ## --- transition table ---
         h.write("// array containing all transitions  \n")
@@ -60,15 +62,16 @@ def generate():
 
         h.write("// lookup table (2d array) containing the id's of the transitions corresponding to each mode pair\n")
         h.write("// mode_transitions[i][j] means the transition id that goes from mode i to mode j \n")
-        h.write("extern const uint8_t mode_transitions[N_MODES][N_MODES];\n\n")
+        h.write("extern const uint8_t mode_transitions[N_MODES * N_MODES];\n\n")
 
 
-        # NOTE: I can maybe make this array constant, but not such big of a deal
         h.write("// array holding task handles\n")
         h.write("extern TaskHandle_t task_handles[N_TASKS];\n")
         h.write("\n")
         h.write("// array holding timer handles\n")
         h.write("extern TimerHandle_t timer_handles[N_TASKS];\n")
+        h.write("// array holding semaphore handles\n")
+        h.write("extern SemaphoreHandle_t semaphore_handles[N_TASKS];\n")
 
         h.write("\n")
         h.write("// function for spawning tasks, for their handles and initialization\n")
@@ -76,6 +79,9 @@ def generate():
         h.write("\n")
         h.write("// function for creating the task timers, afterwards started and managed by the mcmanager on startup\n")
         h.write("void create_timers();\n")
+        h.write("//\n")
+        h.write("void mcm_init();\n")
+        h.write("\n")
 
 
 
@@ -92,14 +98,16 @@ def generate():
 
 
         # include directives
+        s.write("#include \"stddef.h\"\n")
+        s.write("#include \"tasks.h\"\n")
+        s.write("#include \"freertos/idf_additions.h\"\n")
         s.write("#include \"gen_data.h\"\n")
         s.write("#include \"mcmanager.h\"\n")
         s.write("#include \"mcm_types.h\"\n")
-        s.write("#include \"stddef.h\"\n")
-        s.write("#include \"tasks.h\"\n")
         s.write("\n\n")
 
         s.write("TaskHandle_t task_handles[N_TASKS];\n")
+        s.write("SemaphoreHandle_t semaphore_handles[N_TASKS];\n")
         s.write("TimerHandle_t timer_handles[N_TASKS];\n\n\n\n")
 
         # returns the id of the transition from source to dest if exists; if not, it returns NULL
@@ -115,23 +123,22 @@ def generate():
             return None
 
 
-        s.write("const uint8_t mode_transitions[N_MODES][N_MODES] = {\n\n")
+        # ---  MODE TRANSITIONS ARRAY  ---
 
-        for source in data.get("modes"):
-            src_id = source.get("id")
-            for dest in data.get("modes"):
-                dest_id = dest.get("id")
-                fetch_result = fetch_transition(src_id, dest_id)
-                if fetch_result == None:
-                    fetch_result = "NO_TRANSITION"
+        s.write("const uint8_t mode_transitions[N_MODES * N_MODES] =\n")
+        s.write("{\n")
 
-                s.write(f"\t[{src_id}][{dest_id}] = {fetch_result},\n")
+        n_modes = len(data.get("modes"))
+        for i in range(n_modes * n_modes):
+            print(f"i = {i}. transition from {i//n_modes} to {i%n_modes}")
+            trans_id = fetch_transition(i//n_modes, i%n_modes)
+            if trans_id == None:
+                trans_id = "NO_TRANSITION"
+            s.write(f"\t[{i}] = {trans_id},\n")
+
+        s.write("};\n\n")
 
 
-        s.write("\n\n};\n\n")
-
-
-        # code generation
 
 
         ## --- taskset specific arrays --- 
@@ -191,7 +198,7 @@ def generate():
 
 
         ## --- mode table ---
-        s.write("const mcm_mode_info_t modes[N_MODES] =  {\n\n")
+        s.write("const mcm_mode_t modes[N_MODES] =  {\n\n")
 
         for mode in data.get("modes"):
             mode_id = mode.get("id")
@@ -216,11 +223,12 @@ def generate():
 
 
         ## initializes all fields to 0, subject to change
-        s.write("mcm_task_t mcm_tasks[N_TASKS] =  {\n\n")
+        s.write("mcm_task_t tasks[N_TASKS] =  {\n\n")
 
         for task in range(n_tasks+1):
 
-            s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 }},\n")
+            #s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 }},\n")
+            s.write(f"\t[{task}] = {{ .id = {task}, .backlog = 0, .last_release = 0 }},\n")
 
         s.write("\n};\n\n")
 
@@ -244,6 +252,19 @@ def generate():
         s.write("\n}\n\n")
 
 
+        # ---  SEMAPHORES  ---
+
+        s.write("void create_semaphores()\n")
+        s.write("{\n")
+
+        for task in data.get("tasks"):
+            task_id = task.get("id")
+            s.write(f"\tsemaphore_handles[{task_id}] = xSemaphoreCreateCounting(LIMIT_BACKLOG , 0);\n")
+
+
+        s.write("}\n\n")
+
+
 
 
         ## --- mcm timers ---
@@ -251,6 +272,7 @@ def generate():
 
 
         ## function for creating the task timers, afterwards started and managed by the mcmanager on startup.
+        """
         s.write("void create_timers(){\n\n")
 
         for task in data.get("tasks"):
@@ -264,11 +286,47 @@ def generate():
 
 
 
-
         s.write("\n}\n\n")
+        """
 
 
+        ## ---  CONFIGURATION STRUCTURE  ---
+        s.write("mcm_config_t sys_config = \n")
+        s.write("{\n")
 
+        s.write("\t.n_tasks = N_TASKS,\n")
+        s.write("\t.n_modes = N_MODES,\n")
+        s.write("\t.n_trans = N_TRANS,\n")
+        s.write("\t.tasks = tasks,\n")
+        s.write("\t.modes = modes,\n")
+        s.write("\t.transitions = transitions,\n")
+        s.write("\t.mode_transitions = mode_transitions,\n")
+        #s.write("\t.task_handles = task_handles,\n")
+        #s.write("\t.timer_handles = timer_handles,\n")
+
+        s.write("};")
+
+
+        s.write("\n\n")
+
+        ## ---  INITIALIZATION FUNCTION  ---
+        modes = data.get("modes")
+        initial_mode = None
+        # TODO: Sanitize this. If multiple modes with id 0, will take the last one... or if no mode with id 0
+        for mode in modes:
+            if mode.get("id") == 0:
+                initial_mode = mode.get("name")
+
+
+        s.write("void mcm_init()\n")
+        s.write("{\n")
+
+        s.write("\tcreate_tasks();\n")
+        #s.write("\tcreate_timers();\n")
+        s.write("\tcreate_semaphores();\n")
+        s.write(f"\tmcm_initial_setup(&sys_config, {initial_mode});\n")
+
+        s.write("};")
 
 
 
