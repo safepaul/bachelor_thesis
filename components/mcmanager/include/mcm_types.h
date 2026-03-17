@@ -2,6 +2,7 @@
 #define MCM_TYPES_H
 
 #include <stdint.h>
+#include "freertos/idf_additions.h"
 #include "portmacro.h"
 
 
@@ -15,8 +16,7 @@ enum
 
 enum 
 {
-    ACTION_NONE = 0,
-    ACTION_CONTINUE,
+    ACTION_CONTINUE = 0,
     ACTION_UPDATE,
     ACTION_RELEASE,
     ACTION_SUSPEND,
@@ -55,7 +55,6 @@ typedef struct
 typedef struct
 {
     TickType_t  last_release;
-    uint8_t     backlog;
     uint8_t     id;
 } mcm_task_t;
 
@@ -99,9 +98,9 @@ typedef struct
     const mcm_transition_t  *transitions;
     const uint8_t           *mode_transitions;
     
-    //TaskHandle_t *task_handles;
-    //TimerHandle_t *timer_handles;
-    //SemaphoreHandle_t *semaphore_handles;
+    TaskHandle_t *task_handles;
+    TimerHandle_t *timer_handles;
+    SemaphoreHandle_t *semaphore_handles;
 } mcm_config_t;
 
 

@@ -28,7 +28,8 @@
 
 *uint8_t mode_transitions[N_MODES*N_MODES]*
 
-**Description**:
+**Description**: A flattened 2D array that serves as a lookup table for transition id's.
+
 
 ### 
 
@@ -67,6 +68,7 @@ void mcm_initial_setup(mcm_config_t *sys_config)
 
 - Nuances:
     - MUST be called from mcm_init() in main().
+    - MUST be called before the task creation to avoid null config pointer.
     - Initializes the starting system configuration **config** to the one coming from the generator. 
     - Sets global variable **system_state** to SYSTEM_STATE_NORMAL.
     - Sets global variable **current_mode** to the *initial_mode* argument.
@@ -77,6 +79,13 @@ void mcm_initial_setup(mcm_config_t *sys_config)
 static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transition, const uint8_t target_mode)
 
 **Description**: Performs the passed-on transition. Returns either MCM_TRANS_SYNC_ALL or MCM_TRANS_SYNC_PENDING.
+
+
+### mcm_perform_action
+
+static void mcm_perform_action(const mcm_transition_task_t *task)
+
+**Description**: Performs the corresponding action to the passed-on task.
 
 
 ### mcm_process_task  
@@ -93,10 +102,19 @@ static bool mcm_process_task(const mcm_transition_task_t *task)
 
 void mcm_wait_for_release(const uint8_t task_id)
 
-**Description**: Stalls the execution of the calling task until it receives a release signal.
+**Description**: Stalls the execution of the calling task until it gets released by mcm_release_job().
 
 - Nuances:
-    - Internally, this function uses FreeRTOS Task Notifications to stall and release the tasks.
+    - Internally, this function uses FreeRTOS Semaphores to stall and release the tasks.
+
+
+### mcm_task_timer_callback_func 
+
+void mcm_task_timer_callback_func(TimerHandle_t xTimer)
+
+**Description**: Callback function that task timers use to periodically release the jobs of the tasks.
+
+- Nuances:
 
 
 ### mcm_get_backlog
@@ -108,6 +126,56 @@ void mcm_get_backlog(const uint8_t task_id)
 - Nuances:
     - Designed to be platform agnostic.
 
+
+### mcm_fetch_transition_id
+
+static uint8_t mcm_fetch_transition_id(const uint8_t source_mode, const uint8_t dest_mode)
+
+**Description**: Returns the transition id of the transition that goes from source_mode to dest_mode.
+
+- Nuances:
+
+
+### mcm_release_job
+
+static void mcm_release_job(const uint8_t task_id)
+
+**Description**: Releases a job of the task with id task_id
+
+- Nuances:
+    - Internally, it 'gives' to the semaphore that corresponds to the task.
+
+
+### mcm_start_initial_task_timers
+
+static void mcm_start_initial_task_timers()
+
+**Description**: Starts the timers of the initial tasks. Basically "launches" the system.
+
+- Nuances:
+    - It MUST be called just once at startup.
+    - It also releases the first jobs of the initial tasks, instead of them being released after their first timer period concludes.
+
+
+### mcm_clear_backlog
+
+static void mcm_clear_backlog(const uint8_t task_id)
+
+**Description**: Clears the backlog of the specified task.
+
+- Nuances:
+    - Because of how Semaphores work, clearing the semaphore count is not straightforward, so this function takes from the semaphore repeatedly until it's empty.
+
+
+### mcm_stop_task_timers
+
+static void mcm_stop_task_timers()
+
+**Description**: Stops the timers of the tasks that are active in the current mode.
+
+- Nuances:
+    - TODO: what if system is in transient mode and an offset timer is running? don't let the mcr happen in the first place?   
+    - TODO: check for error handling 
 
 
 

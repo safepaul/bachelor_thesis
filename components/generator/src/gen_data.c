@@ -66,8 +66,8 @@ const mcm_mode_t modes[N_MODES] =  {
 
 mcm_task_t tasks[N_TASKS] =  {
 
-	[0] = { .id = 0, .backlog = 0, .last_release = 0 },
-	[1] = { .id = 1, .backlog = 0, .last_release = 0 },
+	[0] = { .id = 0, .last_release = 0 },
+	[1] = { .id = 1, .last_release = 0 },
 
 };
 
@@ -84,6 +84,12 @@ void create_semaphores()
 	semaphore_handles[1] = xSemaphoreCreateCounting(LIMIT_BACKLOG , 0);
 }
 
+void create_timers()
+{
+	timer_handles[0] = xTimerCreate( "taskZero_timer", pdMS_TO_TICKS(2000), pdTRUE, (void*)(uintptr_t)0, mcm_task_timer_callback_func );
+	timer_handles[1] = xTimerCreate( "taskOne_timer", pdMS_TO_TICKS(750), pdTRUE, (void*)(uintptr_t)1, mcm_task_timer_callback_func );
+}
+
 mcm_config_t sys_config = 
 {
 	.n_tasks = N_TASKS,
@@ -93,12 +99,16 @@ mcm_config_t sys_config =
 	.modes = modes,
 	.transitions = transitions,
 	.mode_transitions = mode_transitions,
+	.task_handles = task_handles,
+	.timer_handles = timer_handles,
+	.semaphore_handles = semaphore_handles,
 };
 
 void mcm_init()
 {
-	create_tasks();
 	create_semaphores();
+	create_timers();
 	mcm_initial_setup(&sys_config, MODE_INIT);
-};
+	create_tasks();
+}
 

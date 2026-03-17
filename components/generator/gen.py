@@ -227,8 +227,7 @@ def generate():
 
         for task in range(n_tasks+1):
 
-            #s.write(f"\t[{task}] = {{ .id = {task}, .state = STATE_WAITING_FOR_RELEASE, .backlog = 0, .last_release = 0 }},\n")
-            s.write(f"\t[{task}] = {{ .id = {task}, .backlog = 0, .last_release = 0 }},\n")
+            s.write(f"\t[{task}] = {{ .id = {task}, .last_release = 0 }},\n")
 
         s.write("\n};\n\n")
 
@@ -256,44 +255,31 @@ def generate():
 
         s.write("void create_semaphores()\n")
         s.write("{\n")
-
         for task in data.get("tasks"):
             task_id = task.get("id")
             s.write(f"\tsemaphore_handles[{task_id}] = xSemaphoreCreateCounting(LIMIT_BACKLOG , 0);\n")
-
-
         s.write("}\n\n")
 
 
 
 
-        ## --- mcm timers ---
-
-
-
-        ## function for creating the task timers, afterwards started and managed by the mcmanager on startup.
-        """
-        s.write("void create_timers(){\n\n")
-
+        ## ---  TIMERS  ---
+        s.write("void create_timers()\n")
+        s.write("{\n")
         for task in data.get("tasks"):
             task_id = task.get("id")
             is_initial, period, _ = is_task_in_mode_init(task_id);
             # if task is in initial mode, start the timer with initial values
             if(is_initial):
-                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", {period}, pdTRUE, (void*)(uintptr_t){task_id}, task_timer_callback );\n")
+                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", pdMS_TO_TICKS({period}), pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
             else:
-                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, task_timer_callback );\n")
-
-
-
-        s.write("\n}\n\n")
-        """
+                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", pdMS_TO_TICKS(1), pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
+        s.write("}\n\n")
 
 
         ## ---  CONFIGURATION STRUCTURE  ---
         s.write("mcm_config_t sys_config = \n")
         s.write("{\n")
-
         s.write("\t.n_tasks = N_TASKS,\n")
         s.write("\t.n_modes = N_MODES,\n")
         s.write("\t.n_trans = N_TRANS,\n")
@@ -301,13 +287,10 @@ def generate():
         s.write("\t.modes = modes,\n")
         s.write("\t.transitions = transitions,\n")
         s.write("\t.mode_transitions = mode_transitions,\n")
-        #s.write("\t.task_handles = task_handles,\n")
-        #s.write("\t.timer_handles = timer_handles,\n")
-
-        s.write("};")
-
-
-        s.write("\n\n")
+        s.write("\t.task_handles = task_handles,\n")
+        s.write("\t.timer_handles = timer_handles,\n")
+        s.write("\t.semaphore_handles = semaphore_handles,\n")
+        s.write("};\n\n")
 
         ## ---  INITIALIZATION FUNCTION  ---
         modes = data.get("modes")
@@ -321,16 +304,12 @@ def generate():
         s.write("void mcm_init()\n")
         s.write("{\n")
 
-        s.write("\tcreate_tasks();\n")
-        #s.write("\tcreate_timers();\n")
         s.write("\tcreate_semaphores();\n")
+        s.write("\tcreate_timers();\n")
         s.write(f"\tmcm_initial_setup(&sys_config, {initial_mode});\n")
+        s.write("\tcreate_tasks();\n")
 
-        s.write("};")
-
-
-
-        s.write("\n\n")
+        s.write("}\n\n")
         pass
 
 

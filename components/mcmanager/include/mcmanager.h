@@ -14,6 +14,7 @@
 void mcm_initial_setup(mcm_config_t *sys_config, const uint8_t initial_mode);
 void mcm_wait_for_release(const uint8_t task_id);
 void mcm_mc_request(const uint8_t target_mode);
+void mcm_task_timer_callback_func(TimerHandle_t xTimer);
 
 
 
