@@ -9,7 +9,6 @@ Only with task type OLD
 | OLR     | "Suspend with a margin". apply the guard_true logic when the offset expires (stop timer and clear backlog) |
 | OMCR    | Same as OLR.                                                                                                                                                                                                                                                                                                                                                                                            |
 | BZERO   | "Suspend when its backlog is empty". Stop timer and clear backlog even though its empty. When its backlog hits 0 AND its last job finishes executing, change state. [XXX] add a timeout?|
-| BGLOBAL | Same as BZERO, but after all backlogs hit 0.|
 
 ---
 
@@ -22,7 +21,6 @@ Only with tasks of type: UNCHANGED
 | OLR      | [O] Doesn't make too much sense. Maybe start timer back again in some time to avoid congestion...                        |
 | OMCR     | [O] Same as OLR.                                                                                                         |
 | BZERO    | [O] Maybe to let it continue after its backlog is clear, but why?                                                        |
-| BGLOBAL  | [O] Same as BZERO.                                                                                                       |
 
 ---
 
@@ -35,7 +33,6 @@ Only with tasks of type: NEW
 | OLR     | "Release after X time". same as True|
 | OMCR    | Same as OLR.|
 | BZERO   | [O] Makes no sense. Its backlog should be already cleared.                                              |
-| BGLOBAL | [O] Podria ser:  No arranques la tarea nueva hasta que TODAS las viejas hayan terminado su trabajo      |
 
 ---
 
@@ -48,4 +45,3 @@ Only with tasks of type: CHANGED
 | OLR     | "Update with a margin". jobs with old parameters keep on releasing until timer expires. when timer expires, clear backlog and change parameters. The following release will be with the old timer and new priority but the upcoming ones will have updated period |
 | OMCR    | Same as OLR |
 | BZERO   | "Change parameters after its backlog gets cleared". Clear backlog, even though it should be cleared, but still do it for action code consistency. Change parameters. xTimerChangePeriod() starts the timer back again, which should have been stopped in the guard. |
-| BGLOBAL | Same as BZERO.|

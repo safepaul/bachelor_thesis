@@ -38,7 +38,6 @@ enum
     GUARD_OFFSETMCR,
     GUARD_OFFSETLR,
     GUARD_BACKLOG_ZERO,
-    GUARD_BACKLOG_GLOBAL,
     GUARD_COUNT
 }; typedef uint8_t mcm_guard_t;
 

@@ -29,8 +29,8 @@ static const mcm_transition_task_t trans_0_taskset[2] = {
 
 static const mcm_transition_task_t trans_1_taskset[2] = {
 
-	(mcm_transition_task_t){ .transition_id = 1, .id = 0, .type = MCM_TASK_TYPE_CHANGED, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
-	(mcm_transition_task_t){ .transition_id = 1, .id = 1, .type = MCM_TASK_TYPE_NEW, .primitives = (mcm_task_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_BACKLOG_GLOBAL, .guard_value = -1, } },
+	(mcm_transition_task_t){ .transition_id = 1, .id = 0, .type = MCM_TASK_TYPE_CHANGED, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_TRUE, .guard_value = -1, } },
+	(mcm_transition_task_t){ .transition_id = 1, .id = 1, .type = MCM_TASK_TYPE_NEW, .primitives = (mcm_task_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
 
 };
 

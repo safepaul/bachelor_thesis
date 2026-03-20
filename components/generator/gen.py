@@ -40,9 +40,6 @@ def generate():
         h.write("#define LIMIT_BACKLOG (uint8_t) 5\n")
 
         h.write("\n")
-        h.write("// macro for declaring that a transition doesn't exist or hasn't been found\n")
-        h.write("#define NO_TRANSITION (uint8_t) 255\n")
-        h.write("\n")
         h.write("// macro for declaring that a guard has no value\n")
         h.write("#define NO_GUARD_VALUE (int16_t) -1\n")
         h.write("\n\n")

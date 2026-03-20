@@ -5,6 +5,7 @@
 #include "stdlib.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "mcm_log.h"
 #include "mcm_types.h"
@@ -12,13 +13,23 @@
 
 
 /**********************
+ *      DEFINES
+ **********************/
+#define SET_BIT(mask, bit) ((mask) |= ((uint32_t)1 << (bit)))
+#define CLEAR_BIT(mask, bit) ((mask) |= ((uint32_t)0 << (bit)))
+
+
+/**********************
  *  STATIC VARIABLES
  **********************/
-static uint32_t mcr_instant = 0;
+static TickType_t mcr_instant = 0;
 static uint8_t current_mode;
 static mcm_system_state_t system_state;
 static mcm_config_t *config;
 static SemaphoreHandle_t transition_mutex;
+static uint32_t backlog_bitmask;
+static uint32_t offset_bitmask;
+static uint8_t last_transition;
 
 /**********************
  *  STATIC PROTOTYPES
@@ -32,7 +43,9 @@ static void mcm_release_job(const uint8_t task_id);
 static void mcm_start_initial_task_timers();
 static void mcm_clear_backlog(const uint8_t task_id);
 static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode);
-//static void mcm_stop_task_timers();
+static void mcm_offset_timer_callback_func(TimerHandle_t xTimer);
+static void mcm_check_backlog_status(const uint8_t task_id);
+static TickType_t mcm_calculate_offset_delay(const uint16_t offset, const TickType_t offset_reference);
 
 /**********************
  *  GLOBAL FUNCTIONS
@@ -45,17 +58,20 @@ void mcm_initial_setup(mcm_config_t *sys_config, const uint8_t initial_mode)
     system_state = SYSTEM_STATE_NORMAL;
     current_mode = initial_mode;
     transition_mutex = xSemaphoreCreateMutex();
+    backlog_bitmask = 0;
+    offset_bitmask = 0;
+    last_transition = NO_TRANSITION;
 
     mcm_start_initial_task_timers();
 }
 
 void mcm_mc_request(const uint8_t target_mode)
 {
-    // TODO: create a mode_to_string to print mode names here
-    MCM_LOGI("Mode change requested");
+    mcr_instant = xTaskGetTickCount();
+    MCM_LOGI("Mode change requested at instant %d", (int)mcr_instant);
 
-    mcr_instant = pdTICKS_TO_MS(xTaskGetTickCount());
     const uint8_t transition_id = mcm_fetch_transition_id(current_mode, target_mode);
+    last_transition = transition_id;
     const mcm_transition_t *transition = &config->transitions[transition_id];
 
     MCM_LOGI("Performing transition")
@@ -81,6 +97,8 @@ void mcm_wait_for_release(const uint8_t task_id)
     MCM_LOGI("Task %d executing Wait For Release", task_id);
     xSemaphoreTake(config->semaphore_handles[task_id], portMAX_DELAY); 
 
+    mcm_check_backlog_status(task_id);
+
     // Mutex barrier in case there is an ongoing transition
     xSemaphoreTake(transition_mutex, portMAX_DELAY);
     xSemaphoreGive(transition_mutex);
@@ -91,6 +109,10 @@ void mcm_task_timer_callback_func(TimerHandle_t xTimer)
 {
     // Timer ID's correspond to their respective task ID's
     uint8_t task_id = (uint8_t)(uintptr_t) pvTimerGetTimerID(xTimer);
+
+    // remove its bit from the offset tasks mask
+    // check if it was the last of the transient tasks
+
     mcm_release_job(task_id);
 }
 
@@ -105,6 +127,7 @@ static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transit
 
     MCM_LOGI("Performing mode transition. New job releases are blocked.")
     xSemaphoreTake(transition_mutex, portMAX_DELAY);
+    MCM_LOGI("Took from transition mutex");
     for (int i = 0; i < transition->taskset_size; i++) 
     {
         const mcm_transition_task_t *task = &transition->taskset[i];
@@ -120,23 +143,69 @@ static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transit
 static bool mcm_process_task(const mcm_transition_task_t *task)
 {
     const uint8_t guard = task->primitives.guard;
+    const uint8_t task_id = task->id;
+
+    MCM_LOGI("Processing task %d", task_id);
 
     switch (guard) 
     {
         case GUARD_TRUE:
             mcm_perform_action(task);
+            return false;
         break;
 
         case GUARD_BACKLOG_ZERO:
-        break;
-
-        case GUARD_BACKLOG_GLOBAL:
-        break;
-
-        case GUARD_OFFSETLR:
+            if (mcm_get_backlog(task_id) == 0) 
+            {
+                MCM_LOGI("Performing guard BACKLOG_ZERO for task %d. Backlog was already empty, performing action instantly.", task_id);
+                mcm_perform_action(task);
+                return false;
+            }
+            else
+            {
+                MCM_LOGI("Performing guard BACKLOG_ZERO for task %d. Backlog was not empty, stopping timer and letting backlog clear.", task_id);
+                // stop timer if backlog is not empty
+                xTimerStop(config->timer_handles[task_id], 0);
+                // set bit of backlog tasks bitmask 
+                SET_BIT(backlog_bitmask, task_id);
+                return true;
+            }
         break;
 
         case GUARD_OFFSETMCR:
+        case GUARD_OFFSETLR:
+            TickType_t delay;
+            // calculate delay
+            if (guard == GUARD_OFFSETMCR)
+            {
+                MCM_LOGI("Processing guard OFFSETMCR of task %d", task_id);
+                delay = mcm_calculate_offset_delay(task->primitives.guard_value, mcr_instant);
+            }
+            else
+            {
+                MCM_LOGI("Processing guard OFFSETLR of task %d", task_id);
+                delay = mcm_calculate_offset_delay(task->primitives.guard_value, config->tasks[task_id].last_release);
+                MCM_LOGI("Delay = %lu", delay);
+            }
+
+            if (delay == 1)
+            {
+                mcm_perform_action(task);
+            }
+            else
+            {
+                // create timer with that offset (delete afterwards)
+                // TODO: creation+deletion will probably lead to memory fragmentation. Generate them and change parameters instead.
+                TimerHandle_t timer = xTimerCreate("offset_timer", delay, pdFALSE, (void*)(uintptr_t)task_id, mcm_offset_timer_callback_func);
+                xTimerStart(timer, 0);
+
+                // set bit of offset tasks bitmask 
+                SET_BIT(offset_bitmask, task_id);
+            }
+
+
+
+            return true;
         break;
 
         default:
@@ -161,15 +230,15 @@ static void mcm_perform_action(const mcm_transition_task_t *task)
         break;
 
         case ACTION_UPDATE:
-            MCM_LOGI("Action UPDATE performed for task %d. Clearing backlog and changing parameters", task_id);
+            MCM_LOGI("Action UPDATE performed for task %d at %lu. Clearing backlog and changing parameters", task_id, xTaskGetTickCount());
             mcm_clear_backlog(task_id);
             mcm_change_parameters(task_id, dest_mode);
         break;
 
         case ACTION_RELEASE:
             MCM_LOGI("Action RELEASE performed for task %d. Changing parameters, releasing a job and restarting its timer.", task_id);
-            mcm_change_parameters(task_id, dest_mode);
             mcm_release_job(task_id);
+            mcm_change_parameters(task_id, dest_mode);
             xTimerReset(task_timer, 0);
         break;
 
@@ -197,13 +266,15 @@ static uint8_t mcm_get_backlog(const uint8_t task_id)
 
 static void mcm_clear_backlog(const uint8_t task_id)
 {
+    MCM_LOGI("Task %d backlog: %d", task_id, uxSemaphoreGetCount(config->semaphore_handles[task_id]));
     while (xSemaphoreTake(config->semaphore_handles[task_id], 0) == pdTRUE) {}
 }
 
 static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode)
 {
     UBaseType_t new_prio = config->modes[dest_mode].tasks->parameters.priority;
-    TickType_t new_period = pdMS_TO_TICKS(config->modes->tasks->parameters.period);
+    TickType_t new_period = pdMS_TO_TICKS(config->modes[dest_mode].tasks[task_id].parameters.period);
+    MCM_LOGI("New parameters for task %d: new_prio = %d; new_period = %lu", task_id, new_prio, new_period);
 
     vTaskPrioritySet(config->task_handles[task_id], new_prio);
     xTimerChangePeriod(config->timer_handles[task_id], new_period, 0);
@@ -212,27 +283,74 @@ static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode
 static void mcm_release_job(const uint8_t task_id)
 {
     xSemaphoreGive(config->semaphore_handles[task_id]);
+    config->tasks[task_id].last_release = xTaskGetTickCount();
 }
 
 static void mcm_start_initial_task_timers()
 {
     for (int i = 0; i < config->modes[current_mode].n_tasks; i++)
     {
+
         uint8_t task_id = config->modes[current_mode].tasks[i].id; 
+
+        printf("\n!!!!Timer period: %d\n\n", (int)xTimerGetPeriod(config->timer_handles[task_id]));
+
         mcm_release_job(task_id);
         xTimerStart(config->timer_handles[task_id], 0);
     }
 }
 
-/*
-static void mcm_stop_task_timers()
+static void mcm_check_backlog_status(const uint8_t task_id)
 {
-    MCM_LOGI("Stopping task timers");
-    for (int i = 0; i < config->modes[current_mode].n_tasks; i++) 
+    const mcm_transition_task_t *task = &config->transitions[last_transition].taskset[task_id];
+
+    // check if the task was waiting for its backlog to clear. remove its bit from the backlog bitmask if it was and perform its action
+    if (backlog_bitmask & ((uint32_t)1 << task_id))
     {
-        uint8_t task_id = config->modes[current_mode].tasks[i].id;
-        xTimerStop(config->timer_handles[task_id], 0);
-    }    
-    MCM_LOGI("Task timers stopped")
+        CLEAR_BIT(backlog_bitmask, task_id);
+        mcm_perform_action(task);
+
+        // check if it was the last of the transient tasks
+        if (backlog_bitmask == 0 && offset_bitmask == 0)
+        {
+            MCM_LOGI("SETTING SYSTEM STATE TO NORMAL FROM LAST BACKLOG");
+            system_state = SYSTEM_STATE_NORMAL;
+        }
+    }
 }
-*/
+
+static void mcm_offset_timer_callback_func(TimerHandle_t xTimer)
+{
+    // Timer ID's correspond to their respective task ID's
+    uint8_t task_id = (uint8_t)(uintptr_t) pvTimerGetTimerID(xTimer);
+    const mcm_transition_task_t *task = &config->transitions[last_transition].taskset[task_id];
+
+    // remove its bit from the offset tasks mask and perform its action
+    CLEAR_BIT(backlog_bitmask, task_id);
+    mcm_perform_action(task);
+
+    // check if it was the last of the transient tasks
+    if (backlog_bitmask == 0 && offset_bitmask == 0)
+    {
+        MCM_LOGI("SETTING SYSTEM STATE TO NORMAL FROM LAST OFFSET");
+        system_state = SYSTEM_STATE_NORMAL;
+    }
+
+    // delete to avoid heap starvation
+    xTimerDelete(xTimer, 0);
+}
+
+static TickType_t mcm_calculate_offset_delay(const uint16_t offset, const TickType_t offset_reference)
+{
+    printf("\noffset:%lu \noffset_reference:%lu\n\n", pdMS_TO_TICKS(offset), offset_reference);
+    // release at offset_reference + offset
+    TickType_t release_timestamp = offset_reference + pdMS_TO_TICKS(offset);
+    TickType_t current_time = xTaskGetTickCount();
+
+    // delay the task for the difference between the timestamp and the actual time
+    // if timestamp is less than current time, release instantly (casted to int32 to allow negative numbers and avoid underflow)
+    if ((int32_t)(release_timestamp - current_time) <= 0)
+        return 1;
+
+    return release_timestamp - current_time;
+}

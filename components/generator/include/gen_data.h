@@ -19,9 +19,6 @@
 #define N_MODES 2
 #define LIMIT_BACKLOG (uint8_t) 5
 
-// macro for declaring that a transition doesn't exist or hasn't been found
-#define NO_TRANSITION (uint8_t) 255
-
 // macro for declaring that a guard has no value
 #define NO_GUARD_VALUE (int16_t) -1
 

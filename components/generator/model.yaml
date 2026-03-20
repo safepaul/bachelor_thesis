@@ -32,14 +32,14 @@ transitions:
         type: C
         primitives:
           action: "ACTION_UPDATE"
-          guard: "GUARD_OFFSETMCR"
-          guard_value: 3000
+          guard: "GUARD_TRUE"
+          guard_value: -1
       - id: 1 # new
         type: N
         primitives: 
           action: "ACTION_RELEASE"
-          guard: "GUARD_BACKLOG_GLOBAL"
-          guard_value: -1
+          guard: "GUARD_OFFSETMCR"
+          guard_value: 3000
 
 
 

@@ -75,6 +75,7 @@ void mcm_initial_setup(mcm_config_t *sys_config)
     - Sets global variable **system_state** to SYSTEM_STATE_NORMAL.
     - Sets global variable **current_mode** to the *initial_mode* argument.
     - Assigns the global mutex **transition_mutex** a semaphore handle.
+    - Sets both backlog and offset bitmasks to 0.
 
 
 ### mcm_perform_transition  
@@ -173,16 +174,14 @@ static void mcm_clear_backlog(const uint8_t task_id)
 - Nuances:
     - Because of how Semaphores work, clearing the semaphore count is not straightforward, so this function takes from the semaphore repeatedly until it's empty.
 
+### mcm_check_backlog_status
 
-### mcm_stop_task_timers
+static void mcm_check_backlog_status(const uint8_t task_id)
 
-static void mcm_stop_task_timers()
-
-**Description**: Stops the timers of the tasks that are active in the current mode.
+**Description**: Checks if the task was waiting for its backlog to clear and removes its bit from the backlog bitmask if it was. It also changes the system state to NORMAL in case it was the last one of the asynchronous tasks from the last mode transition and performs the scheduled action.
 
 - Nuances:
-    - TODO: what if system is in transient mode and an offset timer is running? don't let the mcr happen in the first place?   
-    - TODO: check for error handling 
+    - This function is meant to be used just after the task takes from the semaphore to release one of its jobs, in case it was waiting for its backlog to clear and signal it to the system.
 
 
 

@@ -7,10 +7,8 @@ void app_main(void)
 {
     mcm_init();
 
-    /*
-    
     // after 6 seconds, mode change request MODE_INIT -> MODE_EMERGENCY (0 -> 1)
-    sleep(6);
+    sleep(3);
     printf("[DEBUG] executing mc request: source = %d,  dest = %d \n",
            MODE_INIT, MODE_EMERGENCY);
 
@@ -25,5 +23,4 @@ void app_main(void)
            MODE_EMERGENCY, MODE_INIT);
     mcm_mc_request(MODE_INIT);
 
-    */
 }

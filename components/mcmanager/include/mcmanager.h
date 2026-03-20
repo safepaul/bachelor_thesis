@@ -9,6 +9,7 @@
 
 #define MCM_MAX_TASKS   (uint8_t)   24
 #define BACKLOG_MAX     (uint8_t)   5
+#define NO_TRANSITION   (uint8_t)   255
 
 
 void mcm_initial_setup(mcm_config_t *sys_config, const uint8_t initial_mode);
