@@ -10,12 +10,14 @@ transitions:
     source_mode: 0
     dest_mode: 1
     taskset:
-      - task_id: 0 # changed
+      - id: 0 # changed
+        type: C
         primitives:
           action: "ACTION_UPDATE"
           guard: "GUARD_OFFSETLR"
           guard_value: 500
-      - task_id: 1 # old
+      - id: 1 # old
+        type: O
         primitives:
           action: "ACTION_SUSPEND"
           guard: "GUARD_BACKLOG_ZERO"
@@ -26,12 +28,14 @@ transitions:
     source_mode: 1
     dest_mode: 0
     taskset:
-      - task_id: 0 # changed
+      - id: 0 # changed
+        type: C
         primitives:
           action: "ACTION_UPDATE"
           guard: "GUARD_OFFSETMCR"
           guard_value: 3000
-      - task_id: 1 # new
+      - id: 1 # new
+        type: N
         primitives: 
           action: "ACTION_RELEASE"
           guard: "GUARD_BACKLOG_GLOBAL"

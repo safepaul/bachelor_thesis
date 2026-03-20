@@ -22,15 +22,15 @@ const uint8_t mode_transitions[N_MODES * N_MODES] =
 
 static const mcm_transition_task_t trans_0_taskset[2] = {
 
-	(mcm_transition_task_t){ .transition_id = 0, .task_id = 0, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETLR, .guard_value = 500, } },
-	(mcm_transition_task_t){ .transition_id = 0, .task_id = 1, .primitives = (mcm_task_primitives_t){ .action = ACTION_SUSPEND, .guard = GUARD_BACKLOG_ZERO, .guard_value = -1, } },
+	(mcm_transition_task_t){ .transition_id = 0, .id = 0, .type = MCM_TASK_TYPE_CHANGED, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETLR, .guard_value = 500, } },
+	(mcm_transition_task_t){ .transition_id = 0, .id = 1, .type = MCM_TASK_TYPE_OLD, .primitives = (mcm_task_primitives_t){ .action = ACTION_SUSPEND, .guard = GUARD_BACKLOG_ZERO, .guard_value = -1, } },
 
 };
 
 static const mcm_transition_task_t trans_1_taskset[2] = {
 
-	(mcm_transition_task_t){ .transition_id = 1, .task_id = 0, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
-	(mcm_transition_task_t){ .transition_id = 1, .task_id = 1, .primitives = (mcm_task_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_BACKLOG_GLOBAL, .guard_value = -1, } },
+	(mcm_transition_task_t){ .transition_id = 1, .id = 0, .type = MCM_TASK_TYPE_CHANGED, .primitives = (mcm_task_primitives_t){ .action = ACTION_UPDATE, .guard = GUARD_OFFSETMCR, .guard_value = 3000, } },
+	(mcm_transition_task_t){ .transition_id = 1, .id = 1, .type = MCM_TASK_TYPE_NEW, .primitives = (mcm_task_primitives_t){ .action = ACTION_RELEASE, .guard = GUARD_BACKLOG_GLOBAL, .guard_value = -1, } },
 
 };
 

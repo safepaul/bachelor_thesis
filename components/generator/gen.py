@@ -140,6 +140,19 @@ def generate():
 
 
 
+        def task_type_expand(type_letter):
+
+            if type_letter == 'C':
+                return "MCM_TASK_TYPE_CHANGED"
+            elif type_letter == 'U':
+                return "MCM_TASK_TYPE_UNCHANGED"
+            elif type_letter == 'N':
+                return "MCM_TASK_TYPE_NEW"
+            elif type_letter == 'O':
+                return "MCM_TASK_TYPE_OLD"
+
+            return None
+
 
         ## --- taskset specific arrays --- 
         ## one per transition, containing data on what and how to perform the actions to a specific task in a specific transition
@@ -152,8 +165,9 @@ def generate():
 
             for task in taskset:
                 primitives = task.get("primitives")
+                task_type = task_type_expand(task.get("type"))
 
-                s.write(f"\t(mcm_transition_task_t){{ .transition_id = {trans_id}, .task_id = {task.get("task_id")}, .primitives = (mcm_task_primitives_t){{ ")
+                s.write(f"\t(mcm_transition_task_t){{ .transition_id = {trans_id}, .id = {task.get("id")}, .type = {task_type}, .primitives = (mcm_task_primitives_t){{ ")
                 s.write(f".action = {primitives.get("action", "ACTION_NONE")}, ")
                 s.write(f".guard = {primitives.get("guard", "GUARD_NONE")}, ")
                 s.write(f".guard_value = {primitives.get("guard_value", -1)}, ")

@@ -46,6 +46,8 @@
 
 ### mcm_mc_request
 
+[XXX]: Se suspende el planificador para garantizar la atomicidad de la transición y evitar condiciones de carrera si una tarea de alta prioridad es liberada durante el bucle de actualización
+
 void mcm_mc_request(uint8_t target_mode_id)
 
 **Description**: Signals the system to perform a mode transition from the mode it was in to the target mode.
@@ -72,6 +74,7 @@ void mcm_initial_setup(mcm_config_t *sys_config)
     - Initializes the starting system configuration **config** to the one coming from the generator. 
     - Sets global variable **system_state** to SYSTEM_STATE_NORMAL.
     - Sets global variable **current_mode** to the *initial_mode* argument.
+    - Assigns the global mutex **transition_mutex** a semaphore handle.
 
 
 ### mcm_perform_transition  
@@ -79,6 +82,9 @@ void mcm_initial_setup(mcm_config_t *sys_config)
 static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transition, const uint8_t target_mode)
 
 **Description**: Performs the passed-on transition. Returns either MCM_TRANS_SYNC_ALL or MCM_TRANS_SYNC_PENDING.
+
+- Nuances:
+    - The function takes the **transition_mutex** so that no new jobs can be released. It gives the mutex once the transition is finished processing.
 
 
 ### mcm_perform_action
@@ -106,6 +112,7 @@ void mcm_wait_for_release(const uint8_t task_id)
 
 - Nuances:
     - Internally, this function uses FreeRTOS Semaphores to stall and release the tasks.
+    - It has a call to take and give the **transition_mutex** in case there is an ongoing transition.
 
 
 ### mcm_task_timer_callback_func 

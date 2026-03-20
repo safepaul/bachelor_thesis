@@ -16,6 +16,15 @@ enum
 
 enum 
 {
+    MCM_TASK_TYPE_CHANGED = 0,
+    MCM_TASK_TYPE_UNCHANGED,
+    MCM_TASK_TYPE_NEW,
+    MCM_TASK_TYPE_OLD,
+    MCM_TASK_TYPE_COUNT
+}; typedef uint8_t mcm_task_type_t;
+
+enum 
+{
     ACTION_CONTINUE = 0,
     ACTION_UPDATE,
     ACTION_RELEASE,
@@ -62,7 +71,8 @@ typedef struct
 {
     mcm_task_primitives_t   primitives;
     uint16_t                transition_id;
-    uint8_t                 task_id;
+    uint8_t                 type;
+    uint8_t                 id;
 } mcm_transition_task_t;
 
 typedef struct 
