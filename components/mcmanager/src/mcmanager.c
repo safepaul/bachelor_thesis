@@ -69,6 +69,7 @@ void mcm_mc_request(const uint8_t target_mode)
     if (system_state != SYSTEM_STATE_NORMAL)
     {
         MCM_LOGW("Mode change request rejected. The system is currently in a transition or in a transient state.");
+        return;
     }
 
     mcr_instant = xTaskGetTickCount();

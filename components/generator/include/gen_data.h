@@ -1,58 +1,28 @@
 #ifndef GEN_DATA_H
 #define GEN_DATA_H
 
-
-
 #include "freertos/idf_additions.h"
 #include "mcm_types.h"
 
-
-
-// macros for the modes
 #define MODE_INIT (uint8_t) 0
 #define MODE_EMERGENCY (uint8_t) 1
 
-
-// useful constants for the program
 #define N_TASKS 2
 #define N_TRANS 2
 #define N_MODES 2
 #define LIMIT_BACKLOG (uint8_t) 5
 
-// macro for declaring that a guard has no value
-#define NO_GUARD_VALUE (int16_t) -1
-
-
-// array containing all modes and information related to them  
 extern const mcm_mode_t modes[N_MODES];
-
-// array containing information for the mcmanager to handle tasks internally  
 extern mcm_task_t tasks[N_TASKS];
-
-// array containing all transitions  
 extern const mcm_transition_t transitions[N_TRANS];
-
-// lookup table (2d array) containing the id's of the transitions corresponding to each mode pair
-// mode_transitions[i][j] means the transition id that goes from mode i to mode j 
 extern const uint8_t mode_transitions[N_MODES * N_MODES];
-
-// array holding task handles
 extern TaskHandle_t task_handles[N_TASKS];
-
-// array holding task timer handles
 extern TimerHandle_t task_timer_handles[N_TASKS];
-// array holding offset timer handles
 extern TimerHandle_t offset_timer_handles[N_TASKS];
-// array holding semaphore handles
 extern SemaphoreHandle_t semaphore_handles[N_TASKS];
 
-// function for spawning tasks, for their handles and initialization
 void create_tasks();
-
-// function for creating the task timers, afterwards started and managed by the mcmanager on startup
 void create_timers();
-//
 void mcm_init();
-
 
 #endif //GEN_DATA_H
