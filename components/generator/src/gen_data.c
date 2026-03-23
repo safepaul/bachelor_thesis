@@ -8,7 +8,8 @@
 
 TaskHandle_t task_handles[N_TASKS];
 SemaphoreHandle_t semaphore_handles[N_TASKS];
-TimerHandle_t timer_handles[N_TASKS];
+TimerHandle_t task_timer_handles[N_TASKS];
+TimerHandle_t offset_timer_handles[N_TASKS];
 
 
 
@@ -86,8 +87,10 @@ void create_semaphores()
 
 void create_timers()
 {
-	timer_handles[0] = xTimerCreate( "taskZero_timer", pdMS_TO_TICKS(2000), pdTRUE, (void*)(uintptr_t)0, mcm_task_timer_callback_func );
-	timer_handles[1] = xTimerCreate( "taskOne_timer", pdMS_TO_TICKS(750), pdTRUE, (void*)(uintptr_t)1, mcm_task_timer_callback_func );
+	task_timer_handles[0] = xTimerCreate( "taskZero_task_timer", pdMS_TO_TICKS(2000), pdTRUE, (void*)(uintptr_t)0, mcm_task_timer_callback_func );
+	offset_timer_handles[0] = xTimerCreate( "taskZero_offset_timer", 1, pdTRUE, (void*)(uintptr_t)0, mcm_offset_timer_callback_func );
+	task_timer_handles[1] = xTimerCreate( "taskOne_task_timer", pdMS_TO_TICKS(750), pdTRUE, (void*)(uintptr_t)1, mcm_task_timer_callback_func );
+	offset_timer_handles[1] = xTimerCreate( "taskOne_offset_timer", 1, pdTRUE, (void*)(uintptr_t)1, mcm_offset_timer_callback_func );
 }
 
 mcm_config_t sys_config = 
@@ -100,7 +103,8 @@ mcm_config_t sys_config =
 	.transitions = transitions,
 	.mode_transitions = mode_transitions,
 	.task_handles = task_handles,
-	.timer_handles = timer_handles,
+	.task_timer_handles = task_timer_handles,
+	.offset_timer_handles = task_timer_handles,
 	.semaphore_handles = semaphore_handles,
 };
 

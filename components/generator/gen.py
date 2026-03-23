@@ -65,8 +65,10 @@ def generate():
         h.write("// array holding task handles\n")
         h.write("extern TaskHandle_t task_handles[N_TASKS];\n")
         h.write("\n")
-        h.write("// array holding timer handles\n")
-        h.write("extern TimerHandle_t timer_handles[N_TASKS];\n")
+        h.write("// array holding task timer handles\n")
+        h.write("extern TimerHandle_t task_timer_handles[N_TASKS];\n")
+        h.write("// array holding offset timer handles\n")
+        h.write("extern TimerHandle_t offset_timer_handles[N_TASKS];\n")
         h.write("// array holding semaphore handles\n")
         h.write("extern SemaphoreHandle_t semaphore_handles[N_TASKS];\n")
 
@@ -105,7 +107,8 @@ def generate():
 
         s.write("TaskHandle_t task_handles[N_TASKS];\n")
         s.write("SemaphoreHandle_t semaphore_handles[N_TASKS];\n")
-        s.write("TimerHandle_t timer_handles[N_TASKS];\n\n\n\n")
+        s.write("TimerHandle_t task_timer_handles[N_TASKS];\n")
+        s.write("TimerHandle_t offset_timer_handles[N_TASKS];\n\n\n\n")
 
         # returns the id of the transition from source to dest if exists; if not, it returns NULL
         ## TODO: must check if there are more than one transition with the same source+dest pair
@@ -280,11 +283,14 @@ def generate():
         for task in data.get("tasks"):
             task_id = task.get("id")
             is_initial, period, _ = is_task_in_mode_init(task_id);
+            # TASK timers
             # if task is in initial mode, start the timer with initial values
             if(is_initial):
-                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", pdMS_TO_TICKS({period}), pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
+                s.write(f"\ttask_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_task_timer\", pdMS_TO_TICKS({period}), pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
             else:
-                s.write(f"\ttimer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_timer\", pdMS_TO_TICKS(1), pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
+                s.write(f"\ttask_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_task_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
+            # OFFSET timers
+            s.write(f"\toffset_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_offset_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, mcm_offset_timer_callback_func );\n")
         s.write("}\n\n")
 
 
@@ -299,7 +305,8 @@ def generate():
         s.write("\t.transitions = transitions,\n")
         s.write("\t.mode_transitions = mode_transitions,\n")
         s.write("\t.task_handles = task_handles,\n")
-        s.write("\t.timer_handles = timer_handles,\n")
+        s.write("\t.task_timer_handles = task_timer_handles,\n")
+        s.write("\t.offset_timer_handles = task_timer_handles,\n")
         s.write("\t.semaphore_handles = semaphore_handles,\n")
         s.write("};\n\n")
 

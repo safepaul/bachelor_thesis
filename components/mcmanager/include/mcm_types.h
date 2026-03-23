@@ -108,7 +108,8 @@ typedef struct
     const uint8_t           *mode_transitions;
     
     TaskHandle_t *task_handles;
-    TimerHandle_t *timer_handles;
+    TimerHandle_t *task_timer_handles;
+    TimerHandle_t *offset_timer_handles;
     SemaphoreHandle_t *semaphore_handles;
 } mcm_config_t;
 

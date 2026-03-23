@@ -39,8 +39,10 @@ extern const uint8_t mode_transitions[N_MODES * N_MODES];
 // array holding task handles
 extern TaskHandle_t task_handles[N_TASKS];
 
-// array holding timer handles
-extern TimerHandle_t timer_handles[N_TASKS];
+// array holding task timer handles
+extern TimerHandle_t task_timer_handles[N_TASKS];
+// array holding offset timer handles
+extern TimerHandle_t offset_timer_handles[N_TASKS];
 // array holding semaphore handles
 extern SemaphoreHandle_t semaphore_handles[N_TASKS];
 
