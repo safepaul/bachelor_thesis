@@ -290,7 +290,7 @@ def generate():
             else:
                 s.write(f"\ttask_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_task_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, mcm_task_timer_callback_func );\n")
             # OFFSET timers
-            s.write(f"\toffset_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_offset_timer\", 1, pdTRUE, (void*)(uintptr_t){task_id}, mcm_offset_timer_callback_func );\n")
+            s.write(f"\toffset_timer_handles[{task_id}] = xTimerCreate( \"{task.get("name")}_offset_timer\", 1, pdFALSE, (void*)(uintptr_t){task_id}, mcm_offset_timer_callback_func );\n")
         s.write("}\n\n")
 
 
@@ -306,7 +306,7 @@ def generate():
         s.write("\t.mode_transitions = mode_transitions,\n")
         s.write("\t.task_handles = task_handles,\n")
         s.write("\t.task_timer_handles = task_timer_handles,\n")
-        s.write("\t.offset_timer_handles = task_timer_handles,\n")
+        s.write("\t.offset_timer_handles = offset_timer_handles,\n")
         s.write("\t.semaphore_handles = semaphore_handles,\n")
         s.write("};\n\n")
 

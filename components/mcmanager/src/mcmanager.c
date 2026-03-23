@@ -43,7 +43,8 @@ static void mcm_clear_backlog(const uint8_t task_id);
 static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode);
 static void mcm_check_backlog_status(const uint8_t task_id);
 static TickType_t mcm_calculate_offset_delay(const uint16_t offset, const TickType_t offset_reference);
-static const mcm_transition_task_t * mcm_fetch_taskset_task_by_id(const uint8_t task_id);
+static const mcm_transition_task_t* mcm_fetch_transition_task_by_id(const uint8_t task_id, const uint8_t transition_id);
+static const mcm_mode_task_t* mcm_fetch_mode_task_by_id(const uint8_t task_id, const uint8_t mode_id);
 
 /**********************
  *  GLOBAL FUNCTIONS
@@ -120,13 +121,10 @@ void mcm_task_timer_callback_func(TimerHandle_t xTimer)
 
 void mcm_offset_timer_callback_func(TimerHandle_t xTimer)
 {
-    // it's a one-shot timer that will get called many times, so we use pdTRUE during creation but stop it when its callback executes
-    xTimerStop(xTimer, 0);
-
     // Timer ID's correspond to their respective task ID's
     const uint8_t task_id = (uint8_t)(uintptr_t) pvTimerGetTimerID(xTimer);
 
-    const mcm_transition_task_t *task = mcm_fetch_taskset_task_by_id(task_id);
+    const mcm_transition_task_t *task = mcm_fetch_transition_task_by_id(task_id, last_transition);
     //if (task == NULL) abort();
 
     // to avoid user calling an mcr() while the asychronous actions are being applied
@@ -300,8 +298,10 @@ static void mcm_clear_backlog(const uint8_t task_id)
 
 static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode)
 {
-    UBaseType_t new_prio = config->modes[dest_mode].tasks->parameters.priority;
-    TickType_t new_period = pdMS_TO_TICKS(config->modes[dest_mode].tasks[task_id].parameters.period);
+    const mcm_mode_task_t *task = mcm_fetch_mode_task_by_id(task_id, dest_mode);
+
+    UBaseType_t new_prio = task->parameters.priority;
+    TickType_t new_period = pdMS_TO_TICKS(task->parameters.period);
     MCM_LOGI("New parameters for task %d: new_prio = %d; new_period = %lu", task_id, new_prio, new_period);
 
     vTaskPrioritySet(config->task_handles[task_id], new_prio);
@@ -326,7 +326,7 @@ static void mcm_start_initial_task_timers()
 
 static void mcm_check_backlog_status(const uint8_t task_id)
 {
-    const mcm_transition_task_t *task = mcm_fetch_taskset_task_by_id(task_id);
+    const mcm_transition_task_t *task = mcm_fetch_transition_task_by_id(task_id, last_transition);
     //if (task == NULL) abort();
 
 
@@ -348,14 +348,26 @@ static void mcm_check_backlog_status(const uint8_t task_id)
     xSemaphoreGive(transition_mutex);
 }
 
-static const mcm_transition_task_t * mcm_fetch_taskset_task_by_id(const uint8_t task_id)
+static const mcm_transition_task_t* mcm_fetch_transition_task_by_id(const uint8_t task_id, const uint8_t transition_id)
 {
-    const mcm_transition_t *trans = &config->transitions[last_transition];
+    const mcm_transition_t *trans = &config->transitions[transition_id];
 
     // taskset[0] is not necessarily task 0. find iteratively
     for (int i = 0; i < trans->taskset_size; i++) 
         if (trans->taskset[i].id == task_id) 
             return &trans->taskset[i];
+
+    return NULL;
+}
+
+static const mcm_mode_task_t* mcm_fetch_mode_task_by_id(const uint8_t task_id, const uint8_t mode_id)
+{
+    const mcm_mode_t *mode = &config->modes[mode_id];
+
+    // mode->task[0] is not necessarily task 0. find iteratively
+    for (int i = 0; i < mode->n_tasks; i++) 
+        if (mode->tasks[i].id == task_id) 
+            return &mode->tasks[i];
 
     return NULL;
 }
