@@ -19,5 +19,4 @@ void mcm_task_timer_callback_func(TimerHandle_t xTimer);
 void mcm_offset_timer_callback_func(TimerHandle_t xTimer);
 
 
-
 #endif // !MCMANAGER_H
