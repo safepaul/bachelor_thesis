@@ -20,49 +20,16 @@ with open("model.yaml") as spec:
 def generate():
     with open("include/gen_data.h", "w") as h:
 
-        n_tasks = len(data.get("tasks"))
-        n_trans = len(data.get("transitions"))
-        n_modes = len(data.get("modes"))
-
         h.write("#ifndef GEN_DATA_H\n")
         h.write("#define GEN_DATA_H\n")
 
         h.write("\n")
 
-        h.write("#include \"freertos/idf_additions.h\"\n")
-        h.write("#include \"mcm_types.h\"\n")
-
-        h.write("\n")
-
-        # mode defines
-        for mode in data.get("modes"):
-                h.write(f"#define {mode.get("name")} (uint8_t) {mode.get("id")}\n")
-
-        h.write("\n")
-
-        h.write(f"#define N_TASKS {n_tasks}\n")
-        h.write(f"#define N_TRANS {n_trans}\n")
-        h.write(f"#define N_MODES {n_modes}\n")
-        h.write("#define LIMIT_BACKLOG (uint8_t) 5\n")
-
-        h.write("\n")
-
-        h.write("extern const mcm_mode_t modes[N_MODES];\n")
-        h.write("extern mcm_task_t tasks[N_TASKS];\n")
-        h.write("extern const mcm_transition_t transitions[N_TRANS];\n")
-        h.write("extern const uint8_t mode_transitions[N_MODES * N_MODES];\n")
-        h.write("extern TaskHandle_t task_handles[N_TASKS];\n")
-        h.write("extern TimerHandle_t task_timer_handles[N_TASKS];\n")
-        h.write("extern TimerHandle_t offset_timer_handles[N_TASKS];\n")
-        h.write("extern SemaphoreHandle_t semaphore_handles[N_TASKS];\n")
-
-        h.write("\n")
-
-        h.write("void create_tasks();\n")
-        h.write("void create_timers();\n")
         h.write("void mcm_init();\n")
 
-        h.write("\n#endif //GEN_DATA_H")
+        h.write("\n")
+
+        h.write("#endif //GEN_DATA_H")
 
         pass
 
