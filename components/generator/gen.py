@@ -25,6 +25,25 @@ def generate():
 
         h.write("\n")
 
+        n_tasks = len(data.get("tasks"))
+        n_trans = len(data.get("transitions"))
+        n_modes = len(data.get("modes"))
+
+        h.write("\n")
+
+        # mode defines
+        for mode in data.get("modes"):
+            h.write(f"#define {mode.get("name")} (uint8_t) {mode.get("id")}\n")
+
+        h.write("\n")
+
+        h.write(f"#define N_TASKS {n_tasks}\n")
+        h.write(f"#define N_TRANS {n_trans}\n")
+        h.write(f"#define N_MODES {n_modes}\n")
+        h.write("#define LIMIT_BACKLOG (uint8_t) 5\n")
+
+        h.write("\n")
+
         h.write("void mcm_init();\n")
 
         h.write("\n")
