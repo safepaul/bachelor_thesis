@@ -1,7 +1,3 @@
-#include "freertos/idf_additions.h"
-#include "freertos/projdefs.h"
-#include "portmacro.h"
-
 #include "stdlib.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,6 +5,7 @@
 #include "mcm_log.h"
 #include "mcm_types.h"
 #include "mcmanager.h"
+
 
 
 /**********************
@@ -38,7 +35,6 @@ static bool mcm_process_task(const mcm_transition_task_t *task);
 static uint8_t mcm_fetch_transition_id(const uint8_t source_mode, const uint8_t dest_mode);
 static uint8_t mcm_get_backlog(const uint8_t task_id);
 static void mcm_release_job(const uint8_t task_id);
-static void mcm_start_initial_task_timers();
 static void mcm_clear_backlog(const uint8_t task_id);
 static void mcm_change_parameters(const uint8_t task_id, const uint8_t dest_mode);
 static void mcm_check_backlog_status(const uint8_t task_id);
@@ -60,20 +56,18 @@ void mcm_initial_setup(mcm_config_t *sys_config, const uint8_t initial_mode)
     backlog_bitmask = 0;
     offset_bitmask = 0;
     last_transition = NO_TRANSITION;
-
-    mcm_start_initial_task_timers();
 }
 
 void mcm_mc_request(const uint8_t target_mode)
 {
+    mcr_instant = xTaskGetTickCount();
+    MCM_LOGI("Mode change requested at instant %d", (int)mcr_instant);
+
     if (system_state != SYSTEM_STATE_NORMAL)
     {
         MCM_LOGW("Mode change request rejected. The system is currently in a transition or in a transient state.");
         return;
     }
-
-    mcr_instant = xTaskGetTickCount();
-    MCM_LOGI("Mode change requested at instant %d", (int)mcr_instant);
 
     const uint8_t transition_id = mcm_fetch_transition_id(current_mode, target_mode);
     last_transition = transition_id;
@@ -100,7 +94,7 @@ void mcm_mc_request(const uint8_t target_mode)
 void mcm_wait_for_release(const uint8_t task_id)
 {
     MCM_LOGI("Task %d executing Wait For Release", task_id);
-    xSemaphoreTake(config->semaphore_handles[task_id], portMAX_DELAY); 
+    xSemaphoreTake(config->semaphore_handles[task_id], portMAX_DELAY);
 
     if (system_state == SYSTEM_STATE_TRANSIENT)
     {
@@ -110,7 +104,16 @@ void mcm_wait_for_release(const uint8_t task_id)
     // Mutex barrier in case there is an ongoing transition
     xSemaphoreTake(transition_mutex, portMAX_DELAY);
     xSemaphoreGive(transition_mutex);
+}
 
+void mcm_start_initial_tasks()
+{
+    for (int i = 0; i < config->modes[current_mode].n_tasks; i++)
+    {
+        uint8_t task_id = config->modes[current_mode].tasks[i].id;
+        mcm_release_job(task_id);
+        xTimerStart(config->task_timer_handles[task_id], 0);
+    }
 }
 
 void mcm_task_timer_callback_func(TimerHandle_t xTimer)
@@ -158,10 +161,9 @@ static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transit
     MCM_LOGI("Performing mode transition. New job releases are blocked.")
     xSemaphoreTake(transition_mutex, portMAX_DELAY);
     MCM_LOGI("Took from transition mutex");
-    for (int i = 0; i < transition->taskset_size; i++) 
+    for (int i = 0; i < transition->taskset_size; i++)
     {
         const mcm_transition_task_t *task = &transition->taskset[i];
-
         has_async |= mcm_process_task(task);
     }
     xSemaphoreGive(transition_mutex);
@@ -177,7 +179,7 @@ static bool mcm_process_task(const mcm_transition_task_t *task)
 
     MCM_LOGI("Processing task %d", task_id);
 
-    switch (guard) 
+    switch (guard)
     {
         case GUARD_TRUE:
             mcm_perform_action(task);
@@ -185,7 +187,7 @@ static bool mcm_process_task(const mcm_transition_task_t *task)
         break;
 
         case GUARD_BACKLOG_ZERO:
-            if (mcm_get_backlog(task_id) == 0) 
+            if (mcm_get_backlog(task_id) == 0)
             {
                 MCM_LOGI("Performing guard BACKLOG_ZERO for task %d. Backlog was already empty, performing action instantly.", task_id);
                 mcm_perform_action(task);
@@ -196,7 +198,7 @@ static bool mcm_process_task(const mcm_transition_task_t *task)
                 MCM_LOGI("Performing guard BACKLOG_ZERO for task %d. Backlog was not empty, stopping timer and letting backlog clear.", task_id);
                 // stop timer if backlog is not empty
                 xTimerStop(config->task_timer_handles[task_id], 0);
-                // set bit of backlog tasks bitmask 
+                // set bit of backlog tasks bitmask
                 SET_BIT(backlog_bitmask, task_id);
                 return true;
             }
@@ -228,7 +230,7 @@ static bool mcm_process_task(const mcm_transition_task_t *task)
                 // start a timer with period = delay
                 xTimerChangePeriod(config->offset_timer_handles[task_id], delay, 0);
 
-                // set bit of offset tasks bitmask 
+                // set bit of offset tasks bitmask
                 SET_BIT(offset_bitmask, task_id);
                 return true;
             }
@@ -250,7 +252,7 @@ static void mcm_perform_action(const mcm_transition_task_t *task)
     const uint8_t dest_mode = config->transitions[task->transition_id].dest_mode;
     const TimerHandle_t task_timer = config->task_timer_handles[task_id];
 
-    switch (action) 
+    switch (action)
     {
         case ACTION_CONTINUE:
             MCM_LOGI("Action CONTINUE performed for task %d. No action is taken", task_id);
@@ -264,9 +266,9 @@ static void mcm_perform_action(const mcm_transition_task_t *task)
 
         case ACTION_RELEASE:
             MCM_LOGI("Action RELEASE performed for task %d. Changing parameters, releasing a job and restarting its timer.", task_id);
+            xTimerReset(task_timer, 0);
             mcm_release_job(task_id);
             mcm_change_parameters(task_id, dest_mode);
-            xTimerReset(task_timer, 0);
         break;
 
         case ACTION_SUSPEND:
@@ -315,16 +317,6 @@ static void mcm_release_job(const uint8_t task_id)
     config->tasks[task_id].last_release = xTaskGetTickCount();
 }
 
-static void mcm_start_initial_task_timers()
-{
-    for (int i = 0; i < config->modes[current_mode].n_tasks; i++)
-    {
-        uint8_t task_id = config->modes[current_mode].tasks[i].id; 
-        mcm_release_job(task_id);
-        xTimerStart(config->task_timer_handles[task_id], 0);
-    }
-}
-
 static void mcm_check_backlog_status(const uint8_t task_id)
 {
     const mcm_transition_task_t *task = mcm_fetch_transition_task_by_id(task_id, last_transition);
@@ -354,8 +346,8 @@ static const mcm_transition_task_t* mcm_fetch_transition_task_by_id(const uint8_
     const mcm_transition_t *trans = &config->transitions[transition_id];
 
     // taskset[0] is not necessarily task 0. find iteratively
-    for (int i = 0; i < trans->taskset_size; i++) 
-        if (trans->taskset[i].id == task_id) 
+    for (int i = 0; i < trans->taskset_size; i++)
+        if (trans->taskset[i].id == task_id)
             return &trans->taskset[i];
 
     return NULL;
@@ -366,8 +358,8 @@ static const mcm_mode_task_t* mcm_fetch_mode_task_by_id(const uint8_t task_id, c
     const mcm_mode_t *mode = &config->modes[mode_id];
 
     // mode->task[0] is not necessarily task 0. find iteratively
-    for (int i = 0; i < mode->n_tasks; i++) 
-        if (mode->tasks[i].id == task_id) 
+    for (int i = 0; i < mode->n_tasks; i++)
+        if (mode->tasks[i].id == task_id)
             return &mode->tasks[i];
 
     return NULL;

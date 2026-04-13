@@ -23,6 +23,14 @@
     well curated before reaching the action phase.
 
 
+# Input sanitization
+## AGT compatibility
+
+## Guard_type - guard_value compatibility
+
+
+
+
 ## General
 - Generates the counting semaphores array:
     - Index is the semaphore 'i' corresponding with task with id 'i'.

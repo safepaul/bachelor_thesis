@@ -1,9 +1,6 @@
-#include "stddef.h"
 #include "tasks.h"
-#include "freertos/idf_additions.h"
 #include "gen_data.h"
 #include "mcmanager.h"
-#include "mcm_types.h"
 
 TaskHandle_t task_handles[N_TASKS];
 SemaphoreHandle_t semaphore_handles[N_TASKS];
@@ -102,5 +99,6 @@ void mcm_init()
 	create_timers();
 	mcm_initial_setup(&sys_config, MODE_INIT);
 	create_tasks();
+	mcm_start_initial_tasks();
 }
 

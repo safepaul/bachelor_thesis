@@ -10,3 +10,12 @@ sdkconfig
 
 # Python libraries
 components/generator/tools/
+
+# Memoria
+memoria/
+
+# Media files
+media/
+
+# compressed project
+tfg.zip

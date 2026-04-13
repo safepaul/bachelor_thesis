@@ -2,9 +2,18 @@
 #define MCM_TYPES_H
 
 #include <stdint.h>
-#include "freertos/idf_additions.h"
-#include "portmacro.h"
 
+#ifdef ESP_PLATFORM
+    // ESP-IDF build system
+    #include "freertos/idf_additions.h"
+    #include "portmacro.h"
+#else
+    // Pure FreeRTOS
+    #include "FreeRTOS.h"
+    #include "task.h"
+    #include "timers.h"
+    #include "semphr.h"
+#endif
 
 enum 
 {
@@ -98,19 +107,19 @@ typedef struct
 
 typedef struct
 {
-    uint8_t n_tasks;
-    uint8_t n_modes;
-    uint8_t n_trans;
-    
     mcm_task_t              *tasks;
     const mcm_mode_t        *modes;
     const mcm_transition_t  *transitions;
     const uint8_t           *mode_transitions;
-    
+
     TaskHandle_t *task_handles;
     TimerHandle_t *task_timer_handles;
     TimerHandle_t *offset_timer_handles;
     SemaphoreHandle_t *semaphore_handles;
+
+    uint8_t n_tasks;
+    uint8_t n_modes;
+    uint8_t n_trans;
 } mcm_config_t;
 
 
