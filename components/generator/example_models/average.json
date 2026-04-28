@@ -1,0 +1,224 @@
+{
+  "transitions": [
+    {
+      "trans_id": 0,
+      "source_mode": 0,
+      "dest_mode": 1,
+      "taskset": [
+        {
+          "id": 0,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",      "guard_value": -1 }
+        },
+        {
+          "id": 5,
+          "type": "U",
+          "primitives": { "action": "continue", "guard": "true",      "guard_value": -1 }
+        },
+        {
+          "id": 1,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "offsetmcr", "guard_value": 100 }
+        },
+        {
+          "id": 2,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "true",      "guard_value": -1 }
+        },
+        {
+          "id": 4,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "true",      "guard_value": -1 }
+        }
+      ]
+    },
+    {
+      "trans_id": 1,
+      "source_mode": 1,
+      "dest_mode": 2,
+      "taskset": [
+        {
+          "id": 0,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 1,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "backlog_zero", "guard_value": -1 }
+        },
+        {
+          "id": 2,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 4,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 5,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 3,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "offsetlr",     "guard_value": 50 }
+        }
+      ]
+    },
+    {
+      "trans_id": 2,
+      "source_mode": 2,
+      "dest_mode": 1,
+      "taskset": [
+        {
+          "id": 0,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 1,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 2,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 4,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 3,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "backlog_zero", "guard_value": -1 }
+        },
+        {
+          "id": 5,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "true",         "guard_value": -1 }
+        }
+      ]
+    },
+    {
+      "trans_id": 3,
+      "source_mode": 1,
+      "dest_mode": 3,
+      "taskset": [
+        {
+          "id": 0,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true", "guard_value": -1 }
+        },
+        {
+          "id": 2,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true", "guard_value": -1 }
+        },
+        {
+          "id": 1,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "true", "guard_value": -1 }
+        },
+        {
+          "id": 4,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "true", "guard_value": -1 }
+        },
+        {
+          "id": 5,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "true", "guard_value": -1 }
+        },
+        {
+          "id": 6,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "true", "guard_value": -1 }
+        }
+      ]
+    },
+    {
+      "trans_id": 4,
+      "source_mode": 3,
+      "dest_mode": 0,
+      "taskset": [
+        {
+          "id": 0,
+          "type": "C",
+          "primitives": { "action": "update",   "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 2,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "backlog_zero", "guard_value": -1 }
+        },
+        {
+          "id": 6,
+          "type": "O",
+          "primitives": { "action": "suspend",  "guard": "true",         "guard_value": -1 }
+        },
+        {
+          "id": 5,
+          "type": "N",
+          "primitives": { "action": "release",  "guard": "offsetmcr",    "guard_value": 200 }
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    { "id": 0, "name": "Telemetry" },
+    { "id": 1, "name": "Sensor_Fusion" },
+    { "id": 2, "name": "Control_Loop" },
+    { "id": 3, "name": "Vision_Processing" },
+    { "id": 4, "name": "Data_Logging" },
+    { "id": 5, "name": "Diagnostics" },
+    { "id": 6, "name": "Failsafe_Monitor" }
+  ],
+  "modes": [
+    {
+      "id": 0,
+      "name": "MODE_BOOT",
+      "active_tasks": [
+        { "id": 0, "parameters": { "period": 200, "priority": 2 } },
+        { "id": 5, "parameters": { "period": 500, "priority": 1 } }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "MODE_NORMAL",
+      "active_tasks": [
+        { "id": 0, "parameters": { "period": 100, "priority": 2 } },
+        { "id": 1, "parameters": { "period": 50,  "priority": 4 } },
+        { "id": 2, "parameters": { "period": 20,  "priority": 5 } },
+        { "id": 4, "parameters": { "period": 1000, "priority": 1 } },
+        { "id": 5, "parameters": { "period": 500, "priority": 1 } }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "MODE_HIGH_PERFORMANCE",
+      "active_tasks": [
+        { "id": 0, "parameters": { "period": 50,  "priority": 3 } },
+        { "id": 1, "parameters": { "period": 25,  "priority": 4 } },
+        { "id": 2, "parameters": { "period": 10,  "priority": 5 } },
+        { "id": 3, "parameters": { "period": 100, "priority": 3 } },
+        { "id": 4, "parameters": { "period": 500, "priority": 2 } }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "MODE_EMERGENCY",
+      "active_tasks": [
+        { "id": 0, "parameters": { "period": 50,  "priority": 4 } },
+        { "id": 2, "parameters": { "period": 10,  "priority": 5 } },
+        { "id": 6, "parameters": { "period": 10,   "priority": 6 } }
+      ]
+    }
+  ]
+}

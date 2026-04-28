@@ -58,7 +58,7 @@ void mcm_initial_setup(mcm_config_t *sys_config, const uint8_t initial_mode)
     last_transition = NO_TRANSITION;
 }
 
-void mcm_mc_request(const uint8_t target_mode)
+int mcm_mc_request(const uint8_t target_mode)
 {
     mcr_instant = xTaskGetTickCount();
     MCM_LOGI("Mode change requested at instant %d", (int)mcr_instant);
@@ -66,8 +66,14 @@ void mcm_mc_request(const uint8_t target_mode)
     if (system_state != SYSTEM_STATE_NORMAL)
     {
         MCM_LOGW("Mode change request rejected. The system is currently in a transition or in a transient state.");
-        return;
+        return 1;
     }
+
+    // transition_mutex will be released when transition processing ends
+    MCM_LOGI("Performing mode change. New job releases are blocked.")
+    xSemaphoreTake(transition_mutex, portMAX_DELAY);
+    MCM_LOGI("Setting system state to TRANSITIONING");
+    system_state = SYSTEM_STATE_TRANSITIONING;
 
     const uint8_t transition_id = mcm_fetch_transition_id(current_mode, target_mode);
     last_transition = transition_id;
@@ -89,6 +95,8 @@ void mcm_mc_request(const uint8_t target_mode)
         MCM_LOGI("Some tasks are waiting to be synchronized with the target mode. Setting system state to TRANSIENT.");
         system_state = SYSTEM_STATE_TRANSIENT;
     }
+
+    return 0;
 }
 
 void mcm_wait_for_release(const uint8_t task_id)
@@ -131,8 +139,8 @@ void mcm_offset_timer_callback_func(TimerHandle_t xTimer)
     const mcm_transition_task_t *task = mcm_fetch_transition_task_by_id(task_id, last_transition);
     //if (task == NULL) abort();
 
-    // to avoid user calling an mcr() while the asychronous actions are being applied
-    xSemaphoreTake(transition_mutex, portMAX_DELAY);
+    // to avoid user calling an mcr() while the asychronous actions are being applied. Not necessary, read backlog bitmask clearing logic
+    // xSemaphoreTake(transition_mutex, portMAX_DELAY);
 
     // remove its bit from the offset tasks mask and perform its action
     CLEAR_BIT(offset_bitmask, task_id);
@@ -145,7 +153,7 @@ void mcm_offset_timer_callback_func(TimerHandle_t xTimer)
         system_state = SYSTEM_STATE_NORMAL;
     }
 
-    xSemaphoreGive(transition_mutex);
+    // xSemaphoreGive(transition_mutex);
 }
 
 
@@ -154,18 +162,14 @@ void mcm_offset_timer_callback_func(TimerHandle_t xTimer)
  **********************/
 static mcm_trans_result_t mcm_perform_transition(const mcm_transition_t *transition, const uint8_t target_mode)
 {
-    MCM_LOGI("Setting system state to TRANSITIONING");
-    system_state = SYSTEM_STATE_TRANSITIONING;
     bool has_async = false;
 
-    MCM_LOGI("Performing mode transition. New job releases are blocked.")
-    xSemaphoreTake(transition_mutex, portMAX_DELAY);
-    MCM_LOGI("Took from transition mutex");
     for (int i = 0; i < transition->taskset_size; i++)
     {
         const mcm_transition_task_t *task = &transition->taskset[i];
         has_async |= mcm_process_task(task);
     }
+
     xSemaphoreGive(transition_mutex);
     MCM_LOGI("Mode transition successfully performed. New job releases are possible.")
 
@@ -266,9 +270,9 @@ static void mcm_perform_action(const mcm_transition_task_t *task)
 
         case ACTION_RELEASE:
             MCM_LOGI("Action RELEASE performed for task %d. Changing parameters, releasing a job and restarting its timer.", task_id);
+            mcm_change_parameters(task_id, dest_mode);
             xTimerReset(task_timer, 0);
             mcm_release_job(task_id);
-            mcm_change_parameters(task_id, dest_mode);
         break;
 
         case ACTION_SUSPEND:
@@ -323,10 +327,10 @@ static void mcm_check_backlog_status(const uint8_t task_id)
     //if (task == NULL) abort();
 
 
-    // to avoid user calling an mcr() while the asychronous actions are being applied
-    xSemaphoreTake(transition_mutex, portMAX_DELAY);
-    // check if the task was waiting for its backlog to clear. remove its bit from the backlog bitmask if it was and perform its action
-    if (backlog_bitmask & ((uint32_t)1 << task_id))
+    // to avoid user calling an mcr() while the asychronous actions are being applied. Not necessary now as this only gets processed during a transient state and an mcr is always rejected in that state
+    // xSemaphoreTake(transition_mutex, portMAX_DELAY);
+    // check if the task was waiting for its backlog to clear. remove its bit from the backlog bitmask only if it was the last job in the backlog if it was and perform its action
+    if (backlog_bitmask & ((uint32_t)1 << task_id) && (mcm_get_backlog(task_id) == 0))
     {
         CLEAR_BIT(backlog_bitmask, task_id);
         mcm_perform_action(task);
@@ -338,7 +342,7 @@ static void mcm_check_backlog_status(const uint8_t task_id)
             system_state = SYSTEM_STATE_NORMAL;
         }
     }
-    xSemaphoreGive(transition_mutex);
+    // xSemaphoreGive(transition_mutex);
 }
 
 static const mcm_transition_task_t* mcm_fetch_transition_task_by_id(const uint8_t task_id, const uint8_t transition_id)

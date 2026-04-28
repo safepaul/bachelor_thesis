@@ -4,6 +4,8 @@ notes/
 # Build results
 build/
 sdkconfig
+dependencies.lock
+managed_components/
 
 # Caches
 .cache

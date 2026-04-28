@@ -46,58 +46,6 @@
           "type": "C",
           "primitives": {
             "action": "update",
-            "guard": "backlog_zero",
-            "guard_value": -1
-          }
-        }
-      ]
-    },
-    {
-      "trans_id": 1,
-      "source_mode": 1,
-      "dest_mode": 0,
-      "taskset": [
-        {
-          "id": 0,
-          "type": "N",
-          "primitives": {
-            "action": "release",
-            "guard": "offsetlr",
-            "guard_value": 3000
-          }
-        },
-        {
-          "id": 1,
-          "type": "N",
-          "primitives": {
-            "action": "release",
-            "guard": "offsetmcr",
-            "guard_value": 500
-          }
-        },
-        {
-          "id": 2,
-          "type": "O",
-          "primitives": {
-            "action": "suspend",
-            "guard": "offsetmcr",
-            "guard_value": 2000
-          }
-        },
-        {
-          "id": 3,
-          "type": "C",
-          "primitives": {
-            "action": "update",
-            "guard": "offsetlr",
-            "guard_value": 2000
-          }
-        },
-        {
-          "id": 4,
-          "type": "C",
-          "primitives": {
-            "action": "update",
             "guard": "offsetmcr",
             "guard_value": 1000
           }

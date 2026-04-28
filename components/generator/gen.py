@@ -3,16 +3,229 @@ import os
 import json
 
 
-# open the JSON file and extract its contents to 'data'
+# ==========================================
+# CONSTANTES Y LÍMITES DEL SISTEMA
+# ==========================================
+MAX_TASKS = 24
+MAX_MODES = 6
+MAX_TRANSITIONS = 36
+
+ALLOWED_ACTIONS = {'N': 'release', 'O': 'suspend', 'C': 'update', 'U': 'continue'}
+ALLOWED_GUARDS = {
+    'N': ['true', 'offsetlr', 'offsetmcr'],
+    'O': ['true', 'offsetlr', 'offsetmcr', 'backlog_zero'],
+    'C': ['true', 'offsetlr', 'offsetmcr', 'backlog_zero'],
+    'U': ['true']
+}
+
+# ==========================================
+# FUNCIONES AUXILIARES DE VALIDACIÓN
+# ==========================================
+
+def check_consecutive_ids(items, entity_name):
+    """Valida que los IDs empiecen en 0 y sean consecutivos (0, 1, 2...)."""
+    ids = sorted([item.get("id") for item in items])
+    expected_ids = list(range(len(items)))
+    if ids != expected_ids:
+        return f"{entity_name} IDs must be consecutive integers starting from 0. Expected {expected_ids}, got {ids}."
+    return None
+
+def check_agt_and_guards(task, trans_id):
+    """Valida la matriz AGT y los valores matemáticos de las guardas."""
+    errors = []
+    task_id = task.get("id")
+    task_type = task.get("type")
+    
+    primitives = task.get("primitives", {})
+    action = primitives.get("action")
+    guard = primitives.get("guard")
+    guard_value = primitives.get("guard_value")
+
+    # 1. Validar Tipo de Tarea
+    if task_type not in ALLOWED_ACTIONS:
+        errors.append(f"[Trans {trans_id} | Task {task_id}] Invalid type '{task_type}'.")
+        return errors
+
+    # 2. Compatibilidad AGT
+    exp_action = ALLOWED_ACTIONS[task_type]
+    if action != exp_action:
+        errors.append(f"[Trans {trans_id} | Task {task_id}] Action '{action}' invalid for type '{task_type}'. Expected '{exp_action}'.")
+    
+    if guard not in ALLOWED_GUARDS[task_type]:
+        errors.append(f"[Trans {trans_id} | Task {task_id}] Guard '{guard}' invalid for type '{task_type}'.")
+
+    # 3. Valor de la Guarda (Offset >= 0, Resto == -1)
+    if guard in ["offsetmcr", "offsetlr"]:
+        if type(guard_value) is not int or guard_value < 0:
+            errors.append(f"[Trans {trans_id} | Task {task_id}] Guard '{guard}' must be >= 0 ms (Got {guard_value}).")
+    else:
+        if guard_value != -1:
+            errors.append(f"[Trans {trans_id} | Task {task_id}] Guard '{guard}' must have value -1 (Got {guard_value}).")
+
+    return errors
+
+def validate_periods(model_data):
+    """
+    Verifica que ninguna tarea tenga un periodo menor o igual a cero.
+    """
+    is_valid = True
+    
+    # Recorremos todos los modos definidos en el JSON
+    for mode in model_data.get("modes", []):
+        mode_name = mode.get("name", f"Desconocido (ID {mode.get('id')})")
+        
+        # Recorremos las tareas activas dentro de cada modo
+        for task in mode.get("active_tasks", []):
+            task_id = task.get("id")
+            parameters = task.get("parameters", {})
+            
+            # Si la tarea tiene el parámetro 'period', lo evaluamos
+            if "period" in parameters:
+                period_value = parameters["period"]
+                
+                # Comprobante estructural: No puede ser <= 0
+                if period_value < 10:
+                    print("[FATAL ERROR] Model validation failed:")
+                    print(f"  ❌ Invalid period in Mode '{mode_name}' (Mode ID: {mode.get('id')}):")
+                    print(f"     Task ID {task_id} has a period of {period_value}. Period must be >= 10.")
+                    is_valid = False
+
+    return is_valid
+
+# ==========================================
+# VALIDADOR PRINCIPAL
+# ==========================================
+
+def validate_model(data):
+    errors = []
+    
+    tasks = data.get("tasks", [])
+    modes = data.get("modes", [])
+    transitions = data.get("transitions", [])
+
+    # ---------------------------------------------------------
+    # 1. Límites del Sistema y Nombres
+    # ---------------------------------------------------------
+    if len(tasks) > MAX_TASKS: errors.append(f"Exceeded MAX_TASKS limit ({len(tasks)} > {MAX_TASKS})")
+    if len(modes) > MAX_MODES: errors.append(f"Exceeded MAX_MODES limit ({len(modes)} > {MAX_MODES})")
+    if len(transitions) > MAX_TRANSITIONS: errors.append(f"Exceeded MAX_TRANS limit ({len(transitions)} > {MAX_TRANSITIONS})")
+
+    err = check_consecutive_ids(tasks, "Task")
+    if err: errors.append(err)
+    
+    err = check_consecutive_ids(modes, "Mode")
+    if err: errors.append(err)
+
+    # Validar espacios en nombres
+    for t in tasks:
+        if " " in t.get("name", ""): errors.append(f"Task {t['id']} name cannot contain spaces.")
+    for m in modes:
+        if " " in m.get("name", ""): errors.append(f"Mode {m['id']} name cannot contain spaces.")
+
+    # ---------------------------------------------------------
+    # 2. Modos y Parámetros
+    # ---------------------------------------------------------
+    mode_dict = {} # Estructura interna rápida: mode_id -> {task_id -> params}
+    for m in modes:
+        tasks_in_mode = {}
+        for t in m.get("active_tasks", []):
+            tid = t["id"]
+            period = t["parameters"].get("period", 0)
+            priority = t["parameters"].get("priority", 0)
+            
+            if type(period) is not int or period <= 0:
+                errors.append(f"[Mode {m['id']} | Task {tid}] Period must be a positive integer > 0.")
+            if type(priority) is not int or priority < 0:
+                errors.append(f"[Mode {m['id']} | Task {tid}] Priority must be an integer >= 0.")
+                
+            tasks_in_mode[tid] = t["parameters"]
+        mode_dict[m["id"]] = tasks_in_mode
+
+    # ---------------------------------------------------------
+    # 3. Transiciones y Coherencia Lógica
+    # ---------------------------------------------------------
+    source_modes_used = set()
+    
+    for tr in transitions:
+        trans_id = tr.get("trans_id")
+        src = tr.get("source_mode")
+        dst = tr.get("dest_mode")
+        
+        # Transiciones inválidas (modos fantasma)
+        if src not in mode_dict:
+            errors.append(f"Transition {trans_id} specifies non-existent source_mode {src}.")
+            continue
+        if dst not in mode_dict:
+            errors.append(f"Transition {trans_id} specifies non-existent dest_mode {dst}.")
+            continue
+            
+        source_modes_used.add(src)
+        
+        src_tasks = set(mode_dict[src].keys())
+        dst_tasks = set(mode_dict[dst].keys())
+        
+        # El taskset debe ser la unión exacta sin repeticiones
+        expected_taskset = src_tasks.union(dst_tasks)
+        actual_taskset = set(t["id"] for t in tr.get("taskset", []))
+        
+        if expected_taskset != actual_taskset:
+            errors.append(f"Transition {trans_id} Taskset Mismatch! Expected tasks {expected_taskset}, but got {actual_taskset}.")
+
+        # Validar Tipos de Tarea (Inferencia vs Declaración) y AGT
+        for t in tr.get("taskset", []):
+            tid = t["id"]
+            decl_type = t.get("type")
+            
+            # Inferencia lógica
+            if tid in dst_tasks and tid not in src_tasks:
+                inferred_type = 'N'
+            elif tid in src_tasks and tid not in dst_tasks:
+                inferred_type = 'O'
+            elif tid in src_tasks and tid in dst_tasks:
+                # Comprobar si cambian los parámetros
+                if mode_dict[src][tid] != mode_dict[dst][tid]:
+                    inferred_type = 'C'
+                else:
+                    inferred_type = 'U'
+            
+            if decl_type != inferred_type:
+                errors.append(f"[Trans {trans_id} | Task {tid}] Type Mismatch: User declared '{decl_type}', but logic dictates it must be '{inferred_type}'.")
+                
+            # Llamada al AGT
+            errors.extend(check_agt_and_guards(t, trans_id))
+
+    # ---------------------------------------------------------
+    # 4. Modos Muertos (Dead-ends)
+    # ---------------------------------------------------------
+    for m_id in mode_dict.keys():
+        if m_id not in source_modes_used:
+            errors.append(f"Dead-end detected: Mode {m_id} has no outgoing transitions.")
+
+    # ---------------------------------------------------------
+    # Resultados
+    # ---------------------------------------------------------
+    if not errors:
+        print("[INFO] Model validation successful. System is structurally and logically intact.")
+    else:
+        print("\n[FATAL ERROR] Model validation failed:")
+        for e in errors:
+            print(f"  ❌ {e}")
+        print("\n[INFO] Aborting generation.")
+        sys.exit(1)
+
+# open the JSON file and extract its contents to 'data', then call the validation function
 with open("model.json") as spec:
     data = json.load(spec)
+    validate_model(data)
+    validate_periods(data)
 
-    g_transition_list = data.get("transitions")
-    g_transition_count = len(g_transition_list)
-    g_task_list = data.get("tasks")
-    g_task_count = len(g_task_list)
-    g_mode_list = data.get("modes")
-    g_mode_count = len(g_mode_list)
+
+g_transition_list = data.get("transitions")
+g_transition_count = len(g_transition_list)
+g_task_list = data.get("tasks")
+g_task_count = len(g_task_list)
+g_mode_list = data.get("modes")
+g_mode_count = len(g_mode_list)
 
 
 ######################
@@ -80,75 +293,10 @@ def job_guard_expand(guard):
 
     return None
 
-def check_guard_value_compatibility(guard, guard_value):
-    if guard == "true":
-        if guard_value == -1:
-            return CheckOk
-    elif guard == "backlog_zero":
-        if guard_value == -1:
-            return CheckOk
-    elif guard == "offsetmcr":
-        if guard_value >= 0:
-            return CheckOk
-    elif guard == "offsetlr":
-        if guard_value >= 0:
-            return CheckOk
-    
-    return CheckNotOk
 
 
-def check_agt_compatibility(task):
-    task_id = task.get("id")
-    task_type = task.get("type")
-    primitives = task.get("primitives")
-    action = primitives.get("action")
-    guard = primitives.get("guard")
-    guard_value = primitives.get("guard_value")
 
-    ## A_RELEASE -> Type NEW (T - OL - OM)
-    ## A_SUSPEND -> Type OLD (T - OL - OM - B) 
-    ## A_UPDATE -> Type CHANGED (T - OL - OM - B)  
-    ## A_CONTINUE -> Type UNCHANGED (T) 
-    if task_type == 'C':
-        if action == "update":
-            # TODO: fix and finish this
-            if guard is in ["true", "backlog_zero", "offsetmcr", "offsetlr"]
-                ret = check_guard_value_compatibility(guard, guard_value)
 
-            else:
-                return f"Task: {task_id}: Invalid guard '{guard}'"
-        else:
-            return f"Task: {task_id}: Invalid action '{action}' for task type '{task_type_expand(task_type)}'"
-
-        # passed all checks
-        return None
-
-    elif task_type == 'U':
-
-    elif task_type == 'N':
-
-    elif task_type == 'O':
-
-    else:
-        return f"Task: {task_id}: Invalid task type '{task_type}'"
-    
-
-def print_validation_errors(error_list):
-    print("error")
-
-######################
-# VALIDATION FUNCTION
-######################
-
-def validate():
-    errors = []
-
-    # AGT validation
-    for transition in g_transition_list:
-        for task in transition.get("taskset"):
-             errors.append(check_agt_compatibility(task))
-
-    print_validation_errors(errors)
 
 
 ######################
@@ -414,6 +562,5 @@ def generate():
 
 
 if __name__ == "__main__":
-    validate()
     generate()
 

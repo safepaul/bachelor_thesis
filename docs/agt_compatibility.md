@@ -30,7 +30,7 @@ Only with tasks of type: NEW
 | RELEASE | New                                                                                                     |
 |---------|---------------------------------------------------------------------------------------------------------|
 | True    | "Release at the mcr_instant". Change parameters if necessary, release a job once and restart its timer. |
-| OLR     | "Release after X time". same as True|
+| OLR     | [O] Makes no sense to release since last release if it's new. It may have been asleep for a lot of time so it would count as instant release (same as True)|
 | OMCR    | Same as OLR.|
 | BZERO   | [O] Makes no sense. Its backlog should be already cleared.                                              |
 
